@@ -1,0 +1,2720 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>뭉타이머 7일 완성 · 코틀린 안드로이드 학습 노트</title>
+<meta name="description" content="코틀린과 Jetpack Compose를 7일 동안 배워 공부 타이머 앱 '뭉타이머'를 직접 만드는 학습용 웹사이트">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 8c14 0 24 10 24 24S46 56 32 56 8 46 8 32 18 8 32 8z' fill='%23FF8FA3'/%3E%3Ccircle cx='24' cy='30' r='3.4' fill='%233D2C3A'/%3E%3Ccircle cx='40' cy='30' r='3.4' fill='%233D2C3A'/%3E%3Cpath d='M27 39c3 3 7 3 10 0' stroke='%233D2C3A' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<!--
+  ============================================================
+  뭉타이머 7일 완성 — 단일 파일 학습 사이트
+  ------------------------------------------------------------
+  이 파일 하나만 브라우저로 열면 됩니다. (서버/인터넷 불필요)
+
+  파일 구조 (위에서 아래 순서)
+    1) <style>            : 디자인(CSS)
+    2) 앱 껍데기 HTML      : 사이드바 + 본문 영역
+    3) <template> 9개      : 페이지별 콘텐츠 데이터
+         page-prep  : 시작하기 전에
+         page-day1 ~ page-day7 : 각 일차
+       각 Day 템플릿은 6개 섹션으로 구성됩니다.
+         data-sec="goal"    오늘의 목표
+         data-sec="concept" 개념 설명
+         data-sec="example" 예제 코드
+         data-sec="studio"  안드로이드 스튜디오 사용법
+         data-sec="quiz"    복습 퀴즈
+         data-sec="task"    오늘의 과제
+    4) <script>           : 동작(JS) — 메뉴, 문법 강조, 복사, 퀴즈, 진행률 저장
+
+  코드 블록은 <script type="text/plain" class="code"> 안에
+  "있는 그대로" 들어 있어서, 소스에서 바로 읽고 고칠 수 있습니다.
+  ============================================================
+-->
+<style>
+/* ---------- 1. 색상 토큰 (뭉 테마) ---------- */
+:root {
+  --bg: #FFF7EF;
+  --bg-deco: #FFEFE2;
+  --surface: #FFFFFF;
+  --surface-2: #FFF1E6;
+  --surface-3: #FDE7EC;
+  --ink: #3D2C3A;
+  --ink-soft: #6E5967;
+  --ink-faint: #9C8794;
+  --line: #F2DCCF;
+  --primary: #FF8FA3;
+  --primary-strong: #F0607F;
+  --primary-ink: #C02D55;
+  --on-primary: #4A1626;
+  --mint: #7FD8BE;
+  --mint-ink: #1E7A61;
+  --lav: #B9A6F5;
+  --lav-ink: #5B45B0;
+  --sun: #FFD166;
+  --sun-ink: #8A5A00;
+  --sky: #8EC5FF;
+  --sky-ink: #1F5FA8;
+  --ok: #2E9E78;
+  --ok-bg: #E2F7EE;
+  --bad: #D9486A;
+  --bad-bg: #FDE6EB;
+  --g-common: #8FA79B;
+  --g-rare: #4F9FF0;
+  --g-epic: #9B6DF0;
+  --g-legend: #F0A92B;
+  --code-bg: #2A2233;
+  --code-bar: #362C41;
+  --code-ink: #F3ECF6;
+  --code-line: #463A52;
+  --shadow: 0 6px 22px rgba(160, 96, 110, .12);
+  --radius: 20px;
+  --radius-sm: 12px;
+  --font: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-round: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "D2Coding", "Cascadia Code", Consolas, "Liberation Mono", monospace;
+  --sidebar-w: 292px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1D1721;
+    --bg-deco: #251D2A;
+    --surface: #2A212F;
+    --surface-2: #33283A;
+    --surface-3: #3B2A38;
+    --ink: #F6EDF3;
+    --ink-soft: #CDBBC9;
+    --ink-faint: #9F8D9C;
+    --line: #45384C;
+    --primary: #FF8FA3;
+    --primary-strong: #FF7C94;
+    --primary-ink: #FFA3B5;
+    --on-primary: #4A1626;
+    --mint-ink: #8FE3CA;
+    --lav-ink: #CBBCFA;
+    --sun-ink: #FFD98A;
+    --sky-ink: #A9D3FF;
+    --ok: #6FD9B2;
+    --ok-bg: #1F3A31;
+    --bad: #FF8FA6;
+    --bad-bg: #43232D;
+    --code-bg: #17121C;
+    --code-bar: #221B29;
+    --code-line: #382E42;
+    --shadow: 0 6px 22px rgba(0, 0, 0, .35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1D1721;
+  --bg-deco: #251D2A;
+  --surface: #2A212F;
+  --surface-2: #33283A;
+  --surface-3: #3B2A38;
+  --ink: #F6EDF3;
+  --ink-soft: #CDBBC9;
+  --ink-faint: #9F8D9C;
+  --line: #45384C;
+  --primary: #FF8FA3;
+  --primary-strong: #FF7C94;
+  --primary-ink: #FFA3B5;
+  --on-primary: #4A1626;
+  --mint-ink: #8FE3CA;
+  --lav-ink: #CBBCFA;
+  --sun-ink: #FFD98A;
+  --sky-ink: #A9D3FF;
+  --ok: #6FD9B2;
+  --ok-bg: #1F3A31;
+  --bad: #FF8FA6;
+  --bad-bg: #43232D;
+  --code-bg: #17121C;
+  --code-bar: #221B29;
+  --code-line: #382E42;
+  --shadow: 0 6px 22px rgba(0, 0, 0, .35);
+  color-scheme: dark;
+}
+
+/* ---------- 2. 기본 ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation: none !important; transition: none !important; }
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 16.5px;
+  line-height: 1.78;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+h1, h2, h3, h4 { font-family: var(--font-round); line-height: 1.35; text-wrap: balance; margin: 0; }
+p { margin: 0 0 .9em; }
+a { color: var(--primary-ink); text-underline-offset: 3px; }
+img, svg { max-width: 100%; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--lav); outline-offset: 2px; border-radius: 6px; }
+kbd {
+  font-family: var(--font-mono); font-size: .82em;
+  background: var(--surface); border: 1px solid var(--line); border-bottom-width: 3px;
+  border-radius: 7px; padding: .08em .45em; white-space: nowrap;
+}
+code {
+  font-family: var(--font-mono); font-size: .88em;
+  background: var(--surface-2); color: var(--primary-ink);
+  padding: .12em .42em; border-radius: 7px;
+}
+strong { font-weight: 700; }
+hr { border: 0; border-top: 2px dashed var(--line); margin: 28px 0; }
+
+/* ---------- 3. 레이아웃 ---------- */
+.app { display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); min-height: 100vh; }
+.sidebar {
+  position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
+  padding: 22px 16px 20px; background: var(--bg-deco); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 16px;
+}
+.brand { display: flex; align-items: center; gap: 12px; padding: 4px 6px; }
+.brand svg { width: 52px; height: 52px; flex: none; }
+.brand-title { font-family: var(--font-round); font-weight: 800; font-size: 1.22rem; line-height: 1.25; }
+.brand-sub { font-size: .8rem; color: var(--ink-soft); }
+.total {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 12px 14px; font-size: .86rem; color: var(--ink-soft);
+}
+.total-row { display: flex; justify-content: space-between; gap: 8px; }
+.total-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.bar { height: 10px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin: 8px 0 8px; }
+.bar > i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, var(--primary), var(--sun)); transition: width .35s ease; }
+.nav { display: flex; flex-direction: column; gap: 6px; }
+.nav-item {
+  display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  width: 100%; text-align: left; border: 1px solid transparent; background: transparent;
+  border-radius: 14px; padding: 9px 10px; text-decoration: none; color: var(--ink);
+}
+.nav-item:hover { background: var(--surface); }
+.nav-item[aria-current="page"] { background: var(--surface); border-color: var(--primary); box-shadow: var(--shadow); }
+.nav-emoji {
+  width: 38px; height: 38px; display: grid; place-items: center; font-size: 1.2rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+}
+.nav-item[aria-current="page"] .nav-emoji { background: var(--surface-3); border-color: transparent; }
+.nav-kicker { font-size: .72rem; font-weight: 700; color: var(--primary-ink); letter-spacing: .04em; }
+.nav-title { font-size: .9rem; font-weight: 600; line-height: 1.3; }
+.nav-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: .72rem; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.nav-check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; font-size: .7rem; color: transparent; }
+.nav-item.is-done .nav-check { background: var(--mint); border-color: var(--mint); color: #114434; }
+.side-foot { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.ghost-btn {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 99px;
+  padding: 6px 12px; font-size: .8rem; color: var(--ink-soft);
+}
+.ghost-btn:hover { border-color: var(--primary); color: var(--ink); }
+
+.main { min-width: 0; padding: 28px clamp(16px, 4vw, 48px) 80px; }
+.page { max-width: 860px; margin: 0 auto; }
+
+/* ---------- 4. 히어로 ---------- */
+.hero {
+  position: relative; overflow: hidden;
+  background: linear-gradient(135deg, var(--surface-3), var(--surface-2));
+  border: 1px solid var(--line); border-radius: 28px; padding: 28px 28px 24px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center;
+}
+.hero-kicker { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: .82rem; letter-spacing: .08em; color: var(--primary-ink); }
+.hero h1 { font-size: clamp(1.55rem, 3.6vw, 2.15rem); font-weight: 800; margin: 6px 0 8px; }
+.hero p { margin: 0; color: var(--ink-soft); }
+.hero-mung { width: 118px; height: 118px; flex: none; }
+.hero-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 99px; padding: 3px 12px; font-size: .8rem; color: var(--ink-soft); }
+.chip.is-on { background: var(--ok-bg); border-color: transparent; color: var(--ok); font-weight: 700; }
+
+.sec-nav {
+  position: sticky; top: 0; z-index: 5; margin: 16px -6px 6px; padding: 8px 6px;
+  display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
+  background: linear-gradient(var(--bg) 78%, transparent);
+}
+.sec-nav::-webkit-scrollbar { display: none; }
+.sec-nav a {
+  flex: none; text-decoration: none; font-size: .84rem; font-weight: 600; color: var(--ink-soft);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 99px; padding: 5px 13px;
+}
+.sec-nav a:hover { border-color: var(--primary); color: var(--ink); }
+
+/* ---------- 5. 섹션 카드 ---------- */
+.sec {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 26px clamp(16px, 3.4vw, 30px) 22px; margin-top: 20px; box-shadow: var(--shadow);
+  scroll-margin-top: 64px;
+}
+.sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.sec-num {
+  width: 44px; height: 44px; flex: none; display: grid; place-items: center; font-size: 1.3rem;
+  border-radius: 14px; background: var(--surface-3);
+}
+.sec[data-sec="concept"] .sec-num { background: color-mix(in srgb, var(--lav) 30%, var(--surface)); }
+.sec[data-sec="example"] .sec-num { background: color-mix(in srgb, var(--sky) 30%, var(--surface)); }
+.sec[data-sec="studio"] .sec-num { background: color-mix(in srgb, var(--mint) 32%, var(--surface)); }
+.sec[data-sec="quiz"] .sec-num { background: color-mix(in srgb, var(--sun) 38%, var(--surface)); }
+.sec-step { font-size: .74rem; font-weight: 800; letter-spacing: .08em; color: var(--ink-faint); }
+.sec-head h2 { font-size: 1.32rem; font-weight: 800; }
+.sec h3 { font-size: 1.08rem; font-weight: 800; margin: 26px 0 10px; padding-left: 12px; border-left: 5px solid var(--primary); border-radius: 3px; }
+.sec h3:first-child { margin-top: 4px; }
+.sec h4 { font-size: .98rem; font-weight: 800; margin: 18px 0 6px; }
+.sec ul, .sec ol { padding-left: 1.35em; margin: 0 0 1em; }
+.sec li { margin: .28em 0; }
+.sec li::marker { color: var(--primary-strong); font-weight: 700; }
+
+/* 연결 카드: 최종 앱의 어느 부분인가 */
+.link-app {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start;
+  background: var(--surface-2); border-radius: 16px; padding: 14px 16px; margin: 14px 0 4px;
+}
+.link-app .ico { font-size: 1.5rem; line-height: 1.2; }
+.link-app > div > b:first-child { display: block; font-family: var(--font-round); }
+
+/* 콜아웃 */
+.note { border-radius: 16px; padding: 13px 16px 13px 46px; margin: 14px 0; position: relative; background: var(--surface-2); font-size: .95rem; }
+.note::before { content: "💡"; position: absolute; left: 14px; top: 11px; font-size: 1.15rem; }
+.note > :last-child { margin-bottom: 0; }
+.note.warn { background: color-mix(in srgb, var(--sun) 24%, var(--surface)); }
+.note.warn::before { content: "⚠️"; }
+.note.honest { background: color-mix(in srgb, var(--lav) 22%, var(--surface)); }
+.note.honest::before { content: "🤝"; }
+.note.analogy { background: color-mix(in srgb, var(--mint) 22%, var(--surface)); }
+.note.analogy::before { content: "🧸"; }
+.note.bug { background: var(--bad-bg); }
+.note.bug::before { content: "🐞"; }
+.note b:first-child { font-family: var(--font-round); }
+
+/* 표 */
+.table-wrap { overflow-x: auto; margin: 12px 0 16px; border: 1px solid var(--line); border-radius: 14px; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { background: var(--surface-2); font-family: var(--font-round); font-weight: 800; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.grade { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap; }
+.grade::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--g-common); }
+.grade.rare::before { background: var(--g-rare); }
+.grade.epic::before { background: var(--g-epic); }
+.grade.legend::before { background: var(--g-legend); }
+
+/* 단계 목록 (안드로이드 스튜디오 사용법) */
+ol.steps { list-style: none; counter-reset: step; padding: 0; margin: 10px 0 16px; }
+ol.steps > li { counter-increment: step; position: relative; padding: 2px 0 12px 44px; margin: 0; }
+ol.steps > li::before {
+  content: counter(step); position: absolute; left: 0; top: 0; width: 30px; height: 30px;
+  display: grid; place-items: center; border-radius: 50%; background: var(--mint); color: #114434;
+  font-weight: 800; font-size: .86rem; font-family: var(--font-round);
+}
+ol.steps > li::after { content: ""; position: absolute; left: 14px; top: 34px; bottom: 2px; width: 2px; background: var(--line); }
+ol.steps > li:last-child::after { display: none; }
+.menu-path { font-weight: 700; color: var(--mint-ink); }
+
+/* 접어두기 */
+details { border: 1px solid var(--line); border-radius: 14px; margin: 10px 0; background: var(--surface); }
+details > summary { list-style: none; cursor: pointer; padding: 11px 16px; font-weight: 700; font-family: var(--font-round); display: flex; align-items: center; gap: 10px; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: "▸"; color: var(--primary-strong); transition: transform .2s; }
+details[open] > summary::before { transform: rotate(90deg); }
+details > .details-body { padding: 2px 16px 14px; }
+details.hint { background: color-mix(in srgb, var(--sun) 14%, var(--surface)); }
+details.answer { background: color-mix(in srgb, var(--mint) 12%, var(--surface)); }
+details.answer > summary::after { content: "먼저 스스로 풀어 본 뒤에 열어 보세요"; font-weight: 500; font-size: .78rem; color: var(--ink-faint); margin-left: auto; font-family: var(--font); }
+
+/* ---------- 6. 코드 블록 ---------- */
+.code-block { margin: 14px 0 18px; border-radius: 16px; overflow: hidden; background: var(--code-bg); border: 1px solid var(--code-line); }
+.code-bar { display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 14px; background: var(--code-bar); color: #CDBFD6; font-size: .78rem; }
+.code-dots { display: inline-flex; gap: 5px; }
+.code-dots i { width: 9px; height: 9px; border-radius: 50%; background: #FF8FA3; }
+.code-dots i:nth-child(2) { background: #FFD166; }
+.code-dots i:nth-child(3) { background: #7FD8BE; }
+.code-title { font-family: var(--font-mono); color: #F3ECF6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.code-lang { margin-left: auto; text-transform: uppercase; letter-spacing: .08em; font-size: .68rem; color: #A898B3; flex: none; }
+.copy-btn { flex: none; border: 1px solid #5A4B68; background: #43364F; color: #F3ECF6; border-radius: 9px; padding: 3px 11px; font-size: .78rem; }
+.copy-btn:hover { background: #55456A; }
+.copy-btn.is-ok { background: var(--mint); border-color: var(--mint); color: #114434; font-weight: 700; }
+.code-block pre { margin: 0; padding: 14px 0; overflow-x: auto; color: var(--code-ink); font-family: var(--font-mono); font-size: .84rem; line-height: 1.68; tab-size: 4; }
+.code-block code { display: block; background: none; color: inherit; padding: 0; font-size: inherit; border-radius: 0; min-width: max-content; }
+.code-block .ln { display: block; padding: 0 16px; min-height: 1.68em; }
+.code-block .ln.hl { background: rgba(127, 216, 190, .16); box-shadow: inset 3px 0 0 var(--mint); }
+.code-block.is-output { background: #201A27; }
+.code-block.is-output pre { color: #D9F5E8; }
+.tk-c { color: #9F90AC; font-style: italic; }
+.tk-k { color: #FF9DB4; font-weight: 600; }
+.tk-s { color: #BEE8A4; }
+.tk-i { color: #FFD98A; }
+.tk-n { color: #FFC978; }
+.tk-t { color: #93D5FF; }
+.tk-f { color: #CDBBFF; }
+.tk-a { color: #FFD166; }
+.tk-g { color: #FF9DB4; }
+.tk-b { color: #93D5FF; }
+
+/* ---------- 7. 퀴즈 ---------- */
+.quiz-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.quiz-score { font-family: var(--font-round); font-weight: 800; font-size: 1.05rem; }
+.quiz-score span { color: var(--primary-ink); font-variant-numeric: tabular-nums; }
+.q { border: 1px solid var(--line); border-radius: 16px; padding: 16px 16px 12px; margin: 14px 0; background: var(--surface); }
+.q-head { display: flex; gap: 10px; align-items: baseline; }
+.q-no { flex: none; font-family: var(--font-round); font-weight: 800; color: var(--primary-ink); }
+.q-type { flex: none; font-size: .7rem; font-weight: 700; border-radius: 99px; padding: 1px 9px; background: var(--surface-2); color: var(--ink-soft); }
+.q-title { font-weight: 700; margin: 0 0 8px; }
+.q-options { list-style: none; padding: 0 !important; margin: 8px 0 4px !important; display: grid; gap: 8px; }
+.q-opt {
+  width: 100%; text-align: left; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start;
+  border: 1.5px solid var(--line); background: var(--surface); border-radius: 12px; padding: 9px 12px;
+}
+.q-opt:hover:not(:disabled) { border-color: var(--primary); background: var(--surface-2); }
+.q-opt:disabled { cursor: default; }
+.q-opt .mark { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: .8rem; font-weight: 800; background: var(--surface-2); color: var(--ink-soft); font-family: var(--font-round); }
+.q-opt.is-correct { border-color: var(--ok); background: var(--ok-bg); }
+.q-opt.is-correct .mark { background: var(--ok); color: #fff; }
+.q-opt.is-wrong { border-color: var(--bad); background: var(--bad-bg); }
+.q-opt.is-wrong .mark { background: var(--bad); color: #fff; }
+.q-fill { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
+.q-fill input {
+  flex: 1 1 180px; min-width: 0; font-family: var(--font-mono); font-size: .95rem; color: var(--ink);
+  border: 1.5px solid var(--line); border-radius: 12px; padding: 9px 12px; background: var(--surface);
+}
+.q-fill input.is-correct { border-color: var(--ok); background: var(--ok-bg); }
+.q-fill input.is-wrong { border-color: var(--bad); background: var(--bad-bg); }
+.btn {
+  border: 0; border-radius: 12px; padding: 9px 18px; font-weight: 700; font-family: var(--font-round);
+  background: var(--primary); color: var(--on-primary);
+}
+.btn:hover { background: var(--primary-strong); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.alt { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
+.q-result { display: none; margin-top: 10px; border-radius: 12px; padding: 10px 14px; font-size: .94rem; }
+.q-result.show { display: block; }
+.q-result.ok { background: var(--ok-bg); }
+.q-result.bad { background: var(--bad-bg); }
+.q-result b.verdict { font-family: var(--font-round); display: block; margin-bottom: 2px; }
+.q-result.ok b.verdict { color: var(--ok); }
+.q-result.bad b.verdict { color: var(--bad); }
+.q-explain > :last-child { margin-bottom: 0; }
+
+/* ---------- 8. 과제 ---------- */
+.checklist { list-style: none; padding: 0 !important; margin: 8px 0 14px !important; display: grid; gap: 8px; }
+.checklist li { margin: 0; }
+.check-item { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: start; border: 1.5px solid var(--line); border-radius: 12px; padding: 9px 12px; cursor: pointer; }
+.check-item input { width: 20px; height: 20px; margin: 4px 0 0; accent-color: var(--primary-strong); }
+.check-item:has(input:checked) { background: var(--ok-bg); border-color: transparent; }
+.done-box { margin-top: 22px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; background: var(--surface-2); border-radius: 16px; padding: 14px 16px; }
+.done-box p { margin: 0; font-size: .92rem; color: var(--ink-soft); }
+.pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; }
+.pager a { flex: 1 1 0; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 16px; font-weight: 700; font-family: var(--font-round); }
+.pager a:hover { border-color: var(--primary); }
+.pager a small { display: block; font-weight: 500; color: var(--ink-faint); font-family: var(--font); }
+.pager a.next { text-align: right; }
+.pager a[hidden] { display: block; visibility: hidden; }
+
+/* ---------- 9. 기타 컴포넌트 ---------- */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 12px 0 16px; }
+.card { border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; background: var(--surface); }
+.card .ico { font-size: 1.5rem; }
+.card b { font-family: var(--font-round); display: block; margin: 2px 0; }
+.card p { margin: 0; font-size: .9rem; color: var(--ink-soft); }
+.roadmap { list-style: none; padding: 0 !important; margin: 10px 0 !important; display: grid; gap: 8px; }
+.roadmap li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: start; border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; margin: 0; }
+.roadmap .d { font-family: var(--font-round); font-weight: 800; color: var(--primary-ink); }
+.roadmap small { display: block; color: var(--ink-soft); }
+.phone {
+  width: min(260px, 100%); margin: 6px auto 14px; border: 8px solid #3D2C3A; border-radius: 34px; background: #FFF7EF; color: #3D2C3A;
+  padding: 18px 14px 14px; text-align: center; font-size: .86rem; box-shadow: var(--shadow);
+}
+.phone .clock { font-family: var(--font-mono); font-size: 2.1rem; font-weight: 700; letter-spacing: .02em; margin: 10px 0 4px; }
+.phone .row { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+.phone .pbtn { border-radius: 99px; padding: 5px 12px; background: #FF8FA3; color: #4A1626; font-weight: 700; font-size: .78rem; }
+.phone .pbtn.alt { background: #FFE3D1; }
+.phone .tabs { display: flex; justify-content: space-around; margin-top: 14px; padding-top: 8px; border-top: 1px solid #F2DCCF; font-size: .72rem; color: #6E5967; }
+.phones { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.sim { border: 1px dashed var(--primary); border-radius: 16px; padding: 16px; background: var(--surface-2); margin: 14px 0; }
+.sim-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.sim input[type="range"] { flex: 1 1 200px; accent-color: var(--primary-strong); }
+.sim-out { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 10px; }
+.sim-cell { background: var(--surface); border-radius: 12px; padding: 8px 10px; font-size: .86rem; }
+.sim-cell b { display: block; font-variant-numeric: tabular-nums; font-family: var(--font-round); font-size: 1.05rem; }
+.sim-result { font-family: var(--font-round); font-weight: 800; min-height: 1.8em; }
+.footer-note { text-align: center; color: var(--ink-faint); font-size: .8rem; margin-top: 36px; }
+.toast {
+  position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+  background: var(--ink); color: var(--bg); border-radius: 99px; padding: 8px 18px; font-size: .88rem; font-weight: 600;
+  transition: opacity .2s, transform .2s; z-index: 50;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.mobile-bar { display: none; }
+
+/* ---------- 10. 반응형 ---------- */
+@media (max-width: 960px) {
+  body { font-size: 16px; }
+  .app { display: block; }
+  .sidebar {
+    position: sticky; top: 0; z-index: 20; height: auto; padding: 8px 12px 8px; gap: 8px; border-right: 0; border-bottom: 1px solid var(--line);
+    overflow: visible;
+  }
+  .brand { padding: 0; gap: 8px; }
+  .brand svg { width: 34px; height: 34px; }
+  .brand-title { font-size: 1rem; }
+  .brand-sub { display: none; }
+  .mobile-bar { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: .76rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .total { display: none; }
+  .side-foot { display: none; }
+  .nav { flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 2px; scrollbar-width: none; margin: 0 -12px; padding-left: 12px; padding-right: 12px; }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav-item { width: auto; flex: none; grid-template-columns: auto auto; gap: 6px; padding: 5px 11px 5px 6px; border-radius: 99px; border-color: var(--line); background: var(--surface); }
+  .nav-emoji { width: 26px; height: 26px; font-size: .9rem; border: 0; background: transparent; }
+  .nav-kicker { display: none; }
+  .nav-title { font-size: .82rem; white-space: nowrap; }
+  .nav-title .long { display: none; }
+  .nav-meta { display: none; }
+  .nav-item.is-done .nav-title::after { content: " ✓"; color: var(--ok); font-weight: 800; }
+  .nav-item[aria-current="page"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); box-shadow: none; }
+  .nav-item[aria-current="page"] .nav-emoji { background: transparent; }
+  .main { padding: 16px 14px 64px; }
+  .hero { grid-template-columns: minmax(0, 1fr); padding: 20px 18px; border-radius: 22px; }
+  .hero-mung { width: 76px; height: 76px; position: absolute; right: 10px; top: 10px; opacity: .9; }
+  .hero-kicker { padding-right: 84px; }
+  .hero h1 { padding-right: 70px; }
+  .sec-nav { position: static; background: none; }
+  .sec { scroll-margin-top: 110px; border-radius: 18px; }
+  .sec-head h2 { font-size: 1.18rem; }
+  .code-block pre { font-size: .78rem; }
+  .code-block .ln { padding: 0 12px; }
+  details.answer > summary::after { display: none; }
+  .pager { flex-direction: column; }
+  .pager a.next { text-align: left; }
+  .pager a[hidden] { display: none; }
+}
+@media (min-width: 961px) {
+  .nav-title .short { display: none; }
+}
+@media print {
+  .sidebar, .sec-nav, .copy-btn, .pager, .done-box { display: none !important; }
+  .app { display: block; }
+  .sec { box-shadow: none; break-inside: avoid-page; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <ellipse cx="60" cy="108" rx="34" ry="6" fill="#3D2C3A" opacity=".1"/>
+        <path d="M60 14c-4-9 9-12 8-2 6-5 13 4 4 8 24 3 40 21 40 43 0 26-21 43-52 43S8 89 8 63c0-23 17-41 42-43-8-5 0-13 10-6z" fill="#FF8FA3"/>
+        <path d="M30 44c6-9 16-14 27-15" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".55"/>
+        <circle cx="43" cy="62" r="6" fill="#3D2C3A"/><circle cx="77" cy="62" r="6" fill="#3D2C3A"/>
+        <circle cx="45" cy="60" r="2" fill="#fff"/><circle cx="79" cy="60" r="2" fill="#fff"/>
+        <ellipse cx="31" cy="75" rx="8" ry="5" fill="#FF5E7E" opacity=".45"/><ellipse cx="89" cy="75" rx="8" ry="5" fill="#FF5E7E" opacity=".45"/>
+        <path d="M52 75c4 6 12 6 16 0" stroke="#3D2C3A" stroke-width="4" stroke-linecap="round" fill="none"/>
+      </svg>
+      <div>
+        <div class="brand-title">뭉타이머 7일 완성</div>
+        <div class="brand-sub">코틀린 · 안드로이드 학습 노트</div>
+      </div>
+      <div class="mobile-bar"><span id="mobileProgress">0/7일</span><button class="ghost-btn" type="button" data-action="theme" aria-label="밝은/어두운 테마 전환">🌗</button></div>
+    </div>
+    <div class="total" aria-live="polite">
+      <div class="total-row"><span>완료한 일차</span><b id="totalDays">0 / 7</b></div>
+      <div class="bar" role="progressbar" aria-label="전체 진행률" aria-valuemin="0" aria-valuemax="7" aria-valuenow="0" id="totalBarWrap"><i id="totalBar"></i></div>
+      <div class="total-row"><span>퀴즈 점수</span><b id="totalQuiz">0 / 0</b></div>
+    </div>
+    <nav class="nav" id="nav" aria-label="일차 메뉴"></nav>
+    <div class="side-foot">
+      <button class="ghost-btn" type="button" data-action="theme">🌗 테마 전환</button>
+      <button class="ghost-btn" type="button" data-action="reset">↺ 진행률 초기화</button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="page" id="page" tabindex="-1"></div>
+    <p class="footer-note">진행률은 이 브라우저(localStorage)에만 저장됩니다 · 뭉과 함께 오늘도 한 걸음 🐾</p>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- =====================================================================
+     ▼▼▼ 여기부터 페이지별 콘텐츠 데이터 (<template>) ▼▼▼
+     ===================================================================== -->
+
+<!-- ===================== 시작하기 전에 ===================== -->
+<template id="page-prep">
+
+<section class="sec" data-title="우리가 7일 뒤에 완성할 앱" data-icon="🐾">
+  <p>이 사이트는 코틀린을 처음 배우는 사람이 <b>7일 동안 하루에 한 Day씩</b> 따라가며, 공부 타이머 앱 <b>「뭉타이머」</b>를 안드로이드 스튜디오로 직접 만들 수 있게 설계한 학습 노트입니다. 매일 배우는 문법이 그날 바로 앱의 한 부분이 됩니다.</p>
+
+  <div class="phones">
+    <div class="phone" aria-label="타이머 화면 미리보기">
+      <div style="font-size:2.6rem">🌱</div>
+      <div>뭉과 함께 공부 중…</div>
+      <div class="clock">00:42:17</div>
+      <div style="font-size:.74rem">30분을 넘겼어요! 종료하면 뭉이 나와요</div>
+      <div class="row"><span class="pbtn alt">일시정지</span><span class="pbtn">종료</span></div>
+      <div class="tabs"><b>⏱️ 타이머</b><span>📖 도감</span><span>👥 그룹</span></div>
+    </div>
+    <div class="phone" aria-label="뭉 도감 화면 미리보기">
+      <b>뭉 도감 5 / 12</b>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px;font-size:1.5rem">
+        <span>🌱</span><span>☁️</span><span>❔</span><span>🍓</span><span>❔</span><span>⭐</span><span>❔</span><span>🔥</span><span>❔</span>
+      </div>
+      <div style="font-size:.74rem;margin-top:8px">모은 뭉은 기기에 저장돼요 (Room)</div>
+      <div class="tabs"><span>⏱️ 타이머</span><b>📖 도감</b><span>👥 그룹</span></div>
+    </div>
+    <div class="phone" aria-label="그룹 랭킹 화면 미리보기">
+      <b>새벽공부방</b> <span style="font-size:.72rem">초대 코드 K7M2QX</span>
+      <div style="text-align:left;margin-top:10px;font-size:.8rem;display:grid;gap:5px">
+        <div>🥇 🔥 지우 · 3시간 10분</div>
+        <div>🥈 ⭐ 나 · 2시간 05분</div>
+        <div>🥉 🌱 민서 · 45분</div>
+      </div>
+      <div style="font-size:.74rem;margin-top:8px">오늘 / 이번 주 랭킹 (Firestore)</div>
+      <div class="tabs"><span>⏱️ 타이머</span><span>📖 도감</span><b>👥 그룹</b></div>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="ico">⏱️</div><b>1. 공부 타이머</b><p>시작 · 일시정지 · 종료. 앱이 백그라운드로 가거나 꺼졌다 켜져도 시간이 정확히 이어집니다.</p></div>
+    <div class="card"><div class="ico">🎁</div><b>2. 뭉 뽑기</b><p>종료할 때 30분 이상 공부했으면 귀여운 캐릭터 「뭉」이 랜덤으로 1마리! 30분 미만이면 안내 메시지만.</p></div>
+    <div class="card"><div class="ico">🌈</div><b>3. 뭉 등급과 도감</b><p>일반 · 희귀 · 영웅 · 전설. 오래 공부할수록 높은 등급 확률이 올라가고, 얻은 뭉은 도감에 저장.</p></div>
+    <div class="card"><div class="ico">👥</div><b>4. 그룹</b><p>그룹 생성, 초대 코드로 참여, 오늘/이번 주 공부 시간 랭킹, 대표 뭉 자랑.</p></div>
+  </div>
+
+  <h3>이 사이트 사용법</h3>
+  <ul>
+    <li>왼쪽(모바일은 위쪽) 메뉴에서 <b>Day 1 ~ Day 7</b>을 고릅니다. 하루 분량은 <b>3~5시간</b>(Day 6만 4~6시간)을 기준으로 잡았습니다.</li>
+    <li>모든 Day는 <b>목표 → 개념 → 예제 → 안드로이드 스튜디오 사용법 → 퀴즈 → 과제</b> 순서입니다. 위에서 아래로 그대로 따라가세요.</li>
+    <li>코드 블록의 <b>복사</b> 버튼을 쓸 수 있지만, 예제는 <b>직접 타이핑</b>하는 쪽이 훨씬 빨리 늡니다. 과제의 모범 답안만 막혔을 때 열어 보세요.</li>
+    <li>퀴즈 점수, 과제 체크, 완료 표시는 이 브라우저에 자동 저장됩니다.</li>
+  </ul>
+</section>
+
+<section class="sec" data-title="시작 전에 준비할 것" data-icon="🧰">
+  <h3>1) 컴퓨터</h3>
+  <div class="table-wrap"><table>
+    <tr><th>항목</th><th>권장</th><th>메모</th></tr>
+    <tr><td>운영체제</td><td>Windows 10/11 64비트, macOS, Linux</td><td>안드로이드 앱은 세 운영체제 어디서든 만들 수 있습니다.</td></tr>
+    <tr><td>메모리(RAM)</td><td>16GB 권장 (최소 8GB)</td><td>8GB라면 에뮬레이터 대신 <b>실제 안드로이드 폰</b>으로 실행하는 것을 강력히 권합니다.</td></tr>
+    <tr><td>저장 공간</td><td>여유 20GB 이상</td><td>안드로이드 스튜디오 + SDK + 에뮬레이터 이미지가 생각보다 큽니다.</td></tr>
+    <tr><td>인터넷</td><td>안정적인 연결</td><td>첫 프로젝트를 만들 때 라이브러리를 수백 MB 내려받습니다.</td></tr>
+  </table></div>
+
+  <h3>2) 안드로이드 스튜디오 설치 <small>(Day 1에서 단계별로 다시 안내)</small></h3>
+  <ol class="steps">
+    <li><a href="https://developer.android.com/studio" target="_blank" rel="noopener">developer.android.com/studio</a>에서 <b>최신 안정 버전</b>을 내려받습니다. 이 사이트는 <b>Android Studio Rabbit 2 (2026.2.2)</b> 기준으로 작성하고 실제 빌드로 확인했습니다. 더 새 버전이 나와 있어도 그대로 쓰면 됩니다.</li>
+    <li>설치 마법사는 전부 기본값(<b>Standard</b>)으로 진행합니다. Android SDK, 에뮬레이터, 필요한 도구가 함께 설치됩니다.</li>
+    <li><b>JDK는 따로 설치하지 않아도 됩니다.</b> 안드로이드 스튜디오 안에 JDK(JetBrains Runtime)가 들어 있고, 프로젝트 빌드에 그것을 그대로 사용합니다.</li>
+  </ol>
+  <div class="note warn"><b>Windows 사용자 이름이 한글이라면</b> — <code>C:\Users\홍길동</code>처럼 경로에 한글이나 공백이 있으면 SDK/에뮬레이터가 오류를 내는 경우가 있습니다. 프로젝트는 <code>C:\dev\MungTimer</code>처럼 영어 경로에 만들고, SDK 위치도 설치 마법사에서 <code>C:\Android\Sdk</code>처럼 영어 경로로 지정하면 안전합니다.</div>
+
+  <h3>3) 앱을 실행할 기기 (둘 중 하나)</h3>
+  <div class="cards">
+    <div class="card"><div class="ico">📱</div><b>실제 안드로이드 폰 (추천)</b><p>Android 8.0 이상 + USB 케이블. 빠르고, 백그라운드 동작을 실제처럼 시험할 수 있습니다. 개발자 옵션 켜는 법은 Day 3에서 안내합니다.</p></div>
+    <div class="card"><div class="ico">🖥️</div><b>에뮬레이터</b><p>폰이 없어도 됩니다. 다만 RAM 16GB 이상을 권장하고, Day 6의 Firebase를 쓰려면 <b>Google Play</b> 아이콘이 있는 시스템 이미지를 골라야 합니다.</p></div>
+  </div>
+
+  <h3>4) Firebase 준비 <small>(Day 6에서 사용)</small></h3>
+  <ul>
+    <li><b>구글 계정</b> 하나면 충분합니다. 결제 수단 등록이 필요 없는 <b>무료 요금제(Spark)</b> 안에서 전부 진행합니다.</li>
+    <li><a href="https://console.firebase.google.com" target="_blank" rel="noopener">console.firebase.google.com</a>에 그 계정으로 로그인만 되는지 미리 확인해 두세요. 프로젝트 생성은 Day 6에서 함께 합니다.</li>
+    <li>그룹 기능을 시험하려면 <b>기기가 2대</b>(폰 + 에뮬레이터, 또는 친구 폰) 있으면 좋습니다. 1대뿐이어도 Firebase 콘솔에서 가짜 멤버 데이터를 넣어 확인하는 방법을 Day 6에서 알려 드립니다.</li>
+  </ul>
+
+  <h3>5) 설치 없이 코틀린 실행하기 <small>(Day 1~2에서 사용)</small></h3>
+  <p>Day 1~2의 순수 코틀린 예제는 브라우저에서 바로 실행되는 <a href="https://play.kotlinlang.org" target="_blank" rel="noopener">Kotlin Playground (play.kotlinlang.org)</a>에서 돌립니다. 가입도 설치도 필요 없습니다. 안드로이드 스튜디오 설치가 오래 걸려도 공부는 바로 시작할 수 있습니다.</p>
+
+  <h3>준비 체크리스트</h3>
+  <ul class="checklist">
+    <li>안드로이드 스튜디오 최신 안정 버전을 설치했다 (Day 1에서 해도 됩니다)</li>
+    <li>실행할 기기를 정했다: 안드로이드 폰(Android 8.0 이상) 또는 에뮬레이터</li>
+    <li>구글 계정으로 Firebase 콘솔에 로그인되는 것을 확인했다</li>
+    <li>Kotlin Playground가 브라우저에서 열리는 것을 확인했다</li>
+    <li>7일 동안 하루 3~5시간을 쓸 일정을 정했다</li>
+  </ul>
+</section>
+
+<section class="sec" data-title="7일 로드맵과 커리큘럼 조정 제안" data-icon="🗺️">
+  <ul class="roadmap">
+    <li><span class="d">Day 1</span><span><b>코틀린 기초</b><small>변수, 타입, 조건문, 반복문, 함수, null 안전성 → 초를 "00:42:17"로 바꾸는 함수, "30분 넘었나?" 판단</small></span></li>
+    <li><span class="d">Day 2</span><span><b>코틀린 핵심</b><small>클래스, data class, enum, 컬렉션, 람다 → 뭉 데이터 모델과 등급 enum</small></span></li>
+    <li><span class="d">Day 3</span><span><b>Compose 기초</b><small>컴포저블, 레이아웃, 상태 → 타이머 화면 UI</small></span></li>
+    <li><span class="d">Day 4</span><span><b>상태 관리와 코루틴</b><small>ViewModel, StateFlow, 코루틴 → 백그라운드에서도 정확한 타이머</small></span></li>
+    <li><span class="d">Day 5</span><span><b>Room + 확률 로직</b><small>시간대별 확률표, 뽑기 코드, 로컬 DB → 뭉 뽑기와 뭉 도감</small></span></li>
+    <li><span class="d">Day 6</span><span><b>Firebase</b><small>익명 로그인, Firestore → 그룹 생성/참여, 랭킹, 대표 뭉 자랑</small></span></li>
+    <li><span class="d">Day 7</span><span><b>완성</b><small>Navigation, 테마, 버그 수정, APK 빌드 → 친구 폰에 설치</small></span></li>
+  </ul>
+
+  <h3>요청하신 흐름에서 바꾼 점 4가지 (이유 포함)</h3>
+  <div class="table-wrap"><table>
+    <tr><th>바꾼 점</th><th>이유</th></tr>
+    <tr><td><b>안드로이드 스튜디오 설치와 프로젝트 생성을 Day 1로 당김</b></td><td>첫 설치와 첫 Gradle Sync는 내려받는 양이 많아 30분~1시간이 걸릴 수 있습니다. Day 1에 걸어 두면 Day 3의 시간을 온전히 화면 만들기에 쓸 수 있습니다. Day 1~2의 코틀린 실습은 Kotlin Playground에서 하므로 설치를 기다리며 공부할 수 있습니다.</td></tr>
+    <tr><td><b>Day 5에 "임시 탭 전환"을 먼저 넣고, Day 7에 Navigation으로 교체</b></td><td>Day 5에 도감 화면이 생기는데 Navigation은 Day 7 주제입니다. Day 5에는 상태 변수 하나로 화면을 바꾸는 가장 단순한 방법을 쓰고, Day 7에 정식 Navigation으로 바꾸면서 "왜 Navigation이 필요한지"를 체감하게 했습니다.</td></tr>
+    <tr><td><b>Day 6의 로그인을 "익명 로그인 + 닉네임"으로 축소</b></td><td>Day 6은 7일 중 가장 무겁습니다(콘솔 설정 + 인증 + DB + 화면). 구글 로그인은 SHA-1 등록 등 초보자가 막히는 단계가 많아 하루에 넣으면 그룹 기능을 끝내기 어렵습니다. 익명 로그인도 Firebase Authentication의 정식 기능이고, 그룹 기능에 필요한 "사용자마다 고유한 ID"를 똑같이 줍니다.</td></tr>
+    <tr><td><b>백그라운드 타이머는 "시작 시각 저장" 방식으로 구현</b></td><td>1초마다 숫자를 세는 방식은 앱이 백그라운드로 가면 멈추거나 밀립니다. 대신 시작한 <b>시각</b>을 저장하고 "지금 시각 − 시작 시각"으로 계산하면, 앱이 꺼졌다 켜져도 정확합니다. 코드도 더 짧습니다.</td></tr>
+  </table></div>
+</section>
+
+<section class="sec" data-title="7일 안에 어려운 부분과 현실적인 대안" data-icon="🤝">
+  <p>숨기지 않고 먼저 말씀드립니다. 아래 항목은 초보자가 7일 안에 "제대로" 하기 어렵습니다. 그래서 범위를 줄인 대안으로 설계했고, 7일 뒤에 도전할 확장 방향도 함께 적었습니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>원래 바라는 것</th><th>7일 안에 어려운 이유</th><th>이 커리큘럼의 대안</th><th>7일 뒤 확장</th></tr>
+    <tr>
+      <td>백그라운드에서도 계속 도는 타이머 + 알림창에 시간 표시</td>
+      <td>포그라운드 서비스, 알림 권한, 서비스 수명주기를 알아야 해서 2~3일 분량입니다.</td>
+      <td><b>시각 저장 방식</b>. 시간은 정확히 유지되지만, 앱 밖에서는 타이머가 보이지 않습니다.</td>
+      <td>Foreground Service + 알림</td>
+    </tr>
+    <tr>
+      <td>구글/이메일 로그인</td>
+      <td>구글 로그인은 SHA-1 인증서 등록, Credential Manager 설정 등 코드 밖의 설정이 많습니다.</td>
+      <td><b>익명 로그인 + 닉네임</b>. 단, 앱을 삭제하거나 기기를 바꾸면 계정(그룹 소속)이 사라집니다.</td>
+      <td>익명 계정에 이메일 계정 "연결"(Day 6 끝에 방법 소개)</td>
+    </tr>
+    <tr>
+      <td>그룹 랭킹</td>
+      <td>서버에서 집계하려면 Cloud Functions(유료 요금제 필요)와 서버 코드가 필요합니다.</td>
+      <td>멤버 문서에 <b>날짜별 공부 시간</b>을 저장하고, 앱에서 더하고 정렬합니다. 한 사람은 그룹 하나만.</td>
+      <td>여러 그룹 가입, 서버 집계</td>
+    </tr>
+    <tr>
+      <td>뭉 자랑 피드</td>
+      <td>글 목록, 좋아요, 시간순 정렬, 페이징까지 하면 화면 하나가 더 필요합니다.</td>
+      <td><b>대표 뭉 1마리</b>를 정하면 랭킹의 내 이름 옆에 표시됩니다.</td>
+      <td>그룹 피드 컬렉션 추가</td>
+    </tr>
+    <tr>
+      <td>귀여운 뭉 캐릭터 그림</td>
+      <td>12종 일러스트를 그리거나 구해야 합니다. 개발이 아니라 디자인 작업입니다.</td>
+      <td><b>이모지 + 등급 색</b>으로 표현. 코드 구조는 그림으로 바꾸기 쉽게 만듭니다.</td>
+      <td>이미지 리소스로 교체, 뽑기 애니메이션</td>
+    </tr>
+    <tr>
+      <td>부정행위 방지</td>
+      <td>공부 시간과 뽑기를 폰 안에서 계산하므로, 기기 시계를 바꾸면 속일 수 있습니다. 막으려면 서버 검증이 필요합니다.</td>
+      <td>친구끼리 쓰는 앱이므로 <b>허용</b>합니다. 대신 타인의 데이터를 못 고치게 하는 Firestore 보안 규칙은 넣습니다.</td>
+      <td>서버 시간 검증, 서버에서 뽑기</td>
+    </tr>
+    <tr>
+      <td>플레이 스토어 출시</td>
+      <td>개발자 계정(유료), 심사, 개인정보처리방침 등이 필요합니다.</td>
+      <td><b>APK 파일</b>을 만들어 친구에게 직접 전달해 설치합니다.</td>
+      <td>서명 키 관리 후 스토어 등록</td>
+    </tr>
+  </table></div>
+  <div class="note honest"><b>하루 분량에 대해서도 솔직하게:</b> Day 3(처음 보는 Compose)와 Day 6(Firebase)은 다른 날보다 오래 걸립니다. 하루에 못 끝냈다면 다음 날 아침 1~2시간을 이어 쓰세요. 7일이 9일이 되어도 괜찮습니다. 각 Day의 과제는 <b>앞 Day의 결과물 위에</b> 쌓이므로, 건너뛰지 말고 과제가 실행되는 것을 확인한 뒤 넘어가는 것이 가장 빠른 길입니다.</div>
+</section>
+
+<section class="sec" data-title="이 사이트의 코드가 기준으로 삼은 버전" data-icon="📌">
+  <p>아래 조합으로 <b>Day 3~7의 앱 코드를 실제로 빌드해 확인</b>했습니다(2026년 11월 기준 최신 안정 버전).</p>
+  <div class="table-wrap"><table>
+    <tr><th>도구 / 라이브러리</th><th>버전</th><th>쓰는 날</th></tr>
+    <tr><td>Android Studio</td><td>Rabbit 2 (2026.2.2)</td><td>Day 1~</td></tr>
+    <tr><td>Android Gradle Plugin (AGP)</td><td>9.5.1</td><td>자동 설정</td></tr>
+    <tr><td>Kotlin</td><td>2.4.21</td><td>Day 1~</td></tr>
+    <tr><td>Jetpack Compose BOM / Material 3</td><td>2026.09.00</td><td>Day 3~</td></tr>
+    <tr><td>Lifecycle (ViewModel)</td><td>2.11.0</td><td>Day 4~</td></tr>
+    <tr><td>Room</td><td>3.0.3 (<code>androidx.room3</code>)</td><td>Day 5~</td></tr>
+    <tr><td>KSP</td><td>2.3.13</td><td>Day 5~</td></tr>
+    <tr><td>Firebase BoM (Auth, Firestore)</td><td>35.1.0</td><td>Day 6~</td></tr>
+    <tr><td>Google services 플러그인</td><td>4.5.0</td><td>Day 6~</td></tr>
+    <tr><td>Navigation Compose</td><td>2.10.2</td><td>Day 7</td></tr>
+  </table></div>
+  <div class="note"><b>버전이 달라도 당황하지 마세요.</b> 안드로이드 스튜디오가 프로젝트를 만들 때 써 주는 버전 숫자(AGP, Kotlin, Compose BOM)는 <b>그대로 두는 것이 원칙</b>입니다. 이 사이트는 "마법사가 만든 파일에 <b>이 줄만 추가</b>하세요" 방식으로 안내합니다. 라이브러리를 추가한 뒤 숫자에 노란 밑줄이 생기면 더 새 버전이 있다는 뜻이고, 그대로 두어도 빌드됩니다.</div>
+  <div class="note warn"><b>인터넷 검색 결과와 코드가 다르게 보일 때</b> — 2026년 들어 바뀐 것이 있습니다. ① Room이 3.0이 되면서 패키지가 <code>androidx.room</code> → <code>androidx.room3</code>로 바뀌었습니다. ② AGP 9부터 <code>org.jetbrains.kotlin.android</code> 플러그인을 쓰지 않습니다(코틀린 지원이 내장됨). 오래된 글의 설정을 섞어 붙이면 빌드 오류가 나니, 설정은 이 사이트의 안내를 따라 주세요.</div>
+</section>
+
+<section class="sec" data-title="7일을 완주하는 공부법" data-icon="🧠">
+  <div class="cards">
+    <div class="card"><div class="ico">⌨️</div><b>눈으로 읽지 말고 손으로</b><p>예제는 복사하지 말고 타이핑하세요. 오타로 나는 오류를 고치는 경험이 가장 값진 공부입니다.</p></div>
+    <div class="card"><div class="ico">🔴</div><b>빨간 글씨와 친해지기</b><p>오류 메시지의 <b>첫 줄</b>과 <b>파일 이름:줄 번호</b>만 읽어도 절반은 해결됩니다. Day 3부터 Logcat 보는 법을 배웁니다.</p></div>
+    <div class="card"><div class="ico">🧪</div><b>조금 쓰고 바로 실행</b><p>20줄을 한 번에 쓰지 말고, 5줄 쓰고 실행하세요. 어디서 틀렸는지 찾기 쉬워집니다.</p></div>
+    <div class="card"><div class="ico">🌙</div><b>막히면 30분 규칙</b><p>30분 넘게 막히면 힌트 → 모범 답안 순서로 열어 보세요. 답을 본 뒤 닫고 다시 써 보면 내 것이 됩니다.</p></div>
+  </div>
+  <p style="margin-top:14px">준비가 끝났다면 <a href="#day1"><b>Day 1 · 코틀린 기초</b></a>로 출발해요! 🌱</p>
+</section>
+
+</template>
+
+<!-- ===================== Day 1 : 코틀린 기초 ===================== -->
+<template id="page-day1">
+
+<section class="sec" data-sec="goal">
+  <p>오늘은 코틀린이라는 언어의 <b>가장 기본이 되는 문장들</b>을 배웁니다. 안드로이드는 잠시 잊고, 브라우저에서 코드를 실행하며 문법에만 집중합니다.</p>
+  <h3>오늘이 끝나면 할 수 있는 것</h3>
+  <ul>
+    <li><code>val</code>과 <code>var</code>로 값을 저장하고, <code>Int</code> · <code>Long</code> · <code>Boolean</code> · <code>String</code> 타입을 구분할 수 있다.</li>
+    <li><code>if</code> / <code>when</code>으로 상황에 따라 다르게 동작하게 만들 수 있다.</li>
+    <li><code>for</code> / <code>while</code>로 반복할 수 있다.</li>
+    <li>재료(매개변수)를 받아 결과를 돌려주는 <b>함수</b>를 만들 수 있다.</li>
+    <li>"값이 없을 수도 있음"을 뜻하는 <b>null</b>을 안전하게 다룰 수 있다.</li>
+  </ul>
+  <div class="link-app">
+    <div class="ico">🔗</div>
+    <div><b>최종 앱과의 연결</b>
+    오늘 과제로 만드는 <code>formatTime()</code>은 타이머 화면의 <b>"00:42:17"</b> 표시에 그대로 쓰입니다. <code>canGetMung()</code>은 종료할 때 <b>"30분 이상인가?"</b>를 판단하는 코드가 됩니다. "뭉이 안 나올 수도 있다"는 상황은 오늘 배우는 <b>null</b>로 표현합니다.</div>
+  </div>
+</section>
+
+<section class="sec" data-sec="concept">
+  <h3>1. 프로그램은 <code>main</code>에서 시작한다</h3>
+  <p>코틀린 프로그램은 <code>fun main()</code>이라는 함수의 중괄호 <code>{ }</code> 안을 위에서 아래로 한 줄씩 실행합니다. <code>println("글자")</code>는 화면에 한 줄을 출력하는 명령입니다.</p>
+
+  <h3>2. 변수: <code>val</code>과 <code>var</code></h3>
+  <div class="note analogy"><b>비유 — 이름표가 붙은 상자.</b> 변수는 값을 담아 두는 상자입니다. <code>val</code>은 값을 넣고 <b>뚜껑을 테이프로 붙여 버린 상자</b>(다시 못 바꿈), <code>var</code>는 <b>언제든 열어서 내용물을 바꿀 수 있는 상자</b>입니다.</div>
+  <ul>
+    <li><code>val goalMinutes = 30</code> → 목표 시간은 바뀌지 않으니 <code>val</code></li>
+    <li><code>var studyMinutes = 0</code> → 공부 시간은 계속 늘어나니 <code>var</code></li>
+  </ul>
+  <p>코틀린의 습관: <b>일단 <code>val</code>로 쓰고, 바꿔야 할 때만 <code>var</code>로 고친다.</b> 바뀌지 않는 값이 많을수록 버그가 줄어듭니다.</p>
+
+  <h3>3. 타입: 상자에 담을 수 있는 것의 종류</h3>
+  <div class="table-wrap"><table>
+    <tr><th>타입</th><th>담는 것</th><th>예</th><th>뭉타이머에서</th></tr>
+    <tr><td><code>Int</code></td><td>정수 (약 ±21억)</td><td><code>30</code></td><td>공부한 분, 확률(%)</td></tr>
+    <tr><td><code>Long</code></td><td>아주 큰 정수</td><td><code>1731200000000L</code></td><td>시각(밀리초), 공부한 초</td></tr>
+    <tr><td><code>Double</code></td><td>소수</td><td><code>0.5</code></td><td>진행률</td></tr>
+    <tr><td><code>Boolean</code></td><td>참/거짓</td><td><code>true</code></td><td>타이머가 실행 중인가</td></tr>
+    <tr><td><code>String</code></td><td>글자들</td><td><code>"콩뭉"</code></td><td>뭉 이름, 닉네임</td></tr>
+  </table></div>
+  <p>타입은 <code>val name: String = "콩뭉"</code>처럼 적지만, 값을 보면 알 수 있을 때는 생략해도 코틀린이 알아서 정합니다(<b>타입 추론</b>). 한 번 정해진 타입은 바뀌지 않습니다. <code>Int</code> 상자에 글자를 넣으려 하면 실행하기도 전에 빨간 줄로 알려 줍니다.</p>
+  <p><b>문자열 템플릿</b>: 문자열 안에 <code>$변수이름</code>을 쓰면 그 자리에 값이 들어갑니다. 계산식이나, 변수 바로 뒤에 한글이 붙는 경우에는 <code>${ }</code>로 감쌉니다. 예: <code>"${minutes}분"</code></p>
+
+  <h3>4. 조건문: <code>if</code>와 <code>when</code></h3>
+  <div class="note analogy"><b>비유 — 갈림길.</b> <code>if</code>는 "조건이 맞으면 왼쪽 길, 아니면 오른쪽 길"인 두 갈래 길입니다. <code>when</code>은 여러 방향이 적힌 <b>표지판</b>입니다. 위에서부터 읽다가 처음 맞는 방향 하나로만 갑니다.</div>
+  <p>코틀린의 <code>if</code>와 <code>when</code>은 <b>값을 만들어 내는 식</b>이기도 합니다. 그래서 <code>val text = if (minutes &gt;= 30) "가능" else "불가능"</code>처럼 결과를 바로 변수에 담을 수 있습니다.</p>
+
+  <h3>5. 반복문: <code>for</code>와 <code>while</code></h3>
+  <ul>
+    <li><code>for (i in 1..5)</code> : 1부터 5까지(5 포함) 차례로 반복. 횟수가 정해져 있을 때.</li>
+    <li><code>0 until 3</code>은 0, 1, 2 (끝 숫자 제외), <code>10 downTo 0 step 5</code>는 10, 5, 0.</li>
+    <li><code>while (조건)</code> : 조건이 참인 <b>동안</b> 계속 반복. 몇 번 돌지 모를 때.</li>
+  </ul>
+  <div class="note warn">조건이 영원히 참이면 프로그램이 끝나지 않습니다(무한 반복). <code>while</code> 안에서는 조건을 언젠가 거짓으로 만드는 코드가 꼭 있어야 합니다.</div>
+
+  <h3>6. 함수: 이름 붙인 작은 기계</h3>
+  <div class="note analogy"><b>비유 — 자판기.</b> 동전(매개변수)을 넣으면 음료(반환값)가 나옵니다. 안에서 무슨 일이 일어나는지 몰라도 이름만 알면 몇 번이든 쓸 수 있습니다.</div>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="함수의 모양">
+//  ①이름     ②재료(매개변수): 타입   ③결과 타입
+fun toMinutes(seconds: Long):        Long {
+    return seconds / 60               // ④ return 뒤의 값이 결과로 나간다
+}
+  </script>
+  <ul>
+    <li>한 줄로 끝나는 함수는 <code>fun canGetMung(minutes: Long): Boolean = minutes &gt;= 30</code>처럼 <code>=</code>로 줄여 씁니다.</li>
+    <li>매개변수에 <b>기본값</b>을 줄 수 있습니다: <code>fun cheer(name: String = "뭉")</code></li>
+    <li>부를 때 <code>cheer(times = 3)</code>처럼 <b>이름을 붙여</b> 넘길 수 있습니다. Day 3의 Compose 코드에서 매일 보게 됩니다.</li>
+  </ul>
+
+  <h3>7. null 안전성: "없을 수도 있음"을 타입으로 표시하기</h3>
+  <p><code>null</code>은 "값이 없음"입니다. 값이 없는 것을 있는 것처럼 쓰면 앱이 갑자기 꺼집니다. 코틀린은 이것을 막으려고 <b>null이 될 수 있는 타입과 없는 타입을 구분</b>합니다.</p>
+  <div class="note analogy"><b>비유 — "비어 있을 수 있음" 스티커.</b> <code>String</code> 상자에는 반드시 글자가 들어 있습니다. <code>String?</code>(물음표)는 "비어 있을 수 있음" 스티커가 붙은 상자입니다. 스티커가 붙은 상자는 <b>열어 보기 전에 확인</b>하지 않으면 코틀린이 사용을 허락하지 않습니다.</div>
+  <div class="table-wrap"><table>
+    <tr><th>도구</th><th>뜻</th><th>예</th></tr>
+    <tr><td><code>?.</code> 안전 호출</td><td>null이 아니면 실행, null이면 그냥 null</td><td><code>mung?.length</code></td></tr>
+    <tr><td><code>?:</code> 엘비스 연산자</td><td>null이면 오른쪽 값을 대신 사용</td><td><code>mung ?: "없음"</code></td></tr>
+    <tr><td><code>if (x != null)</code></td><td>검사한 뒤에는 일반 타입처럼 사용</td><td><code>if (mung != null) mung.length</code></td></tr>
+    <tr><td><code>!!</code></td><td>"절대 null 아님"이라고 우김. null이면 앱이 죽음</td><td>되도록 쓰지 않기</td></tr>
+  </table></div>
+</section>
+
+<section class="sec" data-sec="example">
+  <p>아래 예제를 <a href="https://play.kotlinlang.org" target="_blank" rel="noopener">Kotlin Playground</a>에 <b>직접 타이핑</b>하고 실행해 보세요. 실행 방법은 다음 섹션에 있습니다. 숫자나 글자를 바꿔 보며 결과가 어떻게 달라지는지 꼭 확인하세요.</p>
+
+  <h3>예제 1. 변수와 타입, 문자열 템플릿</h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex1.kt" data-run="d1_ex1">
+fun main() {
+    // val: 한 번 정하면 바꿀 수 없는 값
+    val appName = "뭉타이머"            // 타입을 안 써도 String으로 추론된다
+    val goalMinutes: Int = 30           // 타입을 직접 적어도 된다
+
+    // var: 나중에 바꿀 수 있는 값
+    var studyMinutes = 0
+    studyMinutes = studyMinutes + 15    // 15분 공부
+    studyMinutes += 5                   // 5분 더 (위 줄을 줄여 쓴 것)
+
+    // 자주 쓰는 기본 타입
+    val elapsedSeconds: Long = 2_537L   // 큰 정수는 Long. 밑줄(_)은 읽기 좋으라고 넣는 구분선
+    val rareChance: Double = 25.5       // 소수
+    val isRunning: Boolean = true       // 참(true) 또는 거짓(false)
+    val mungName: String = "콩뭉"       // 문자열은 큰따옴표
+
+    // 문자열 템플릿: $이름 또는 ${계산식}
+    println("$appName 시작!")
+    println("지금까지 ${studyMinutes}분 공부했어요.")                 // 뒤에 한글이 붙으면 ${ } 필수
+    println("목표까지 ${goalMinutes - studyMinutes}분 남았어요.")     // 계산식도 ${ } 안에
+    println("경과 ${elapsedSeconds}초 / 희귀 확률 $rareChance% / 실행 중: $isRunning / $mungName")
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d1_ex1">
+뭉타이머 시작!
+지금까지 20분 공부했어요.
+목표까지 10분 남았어요.
+경과 2537초 / 희귀 확률 25.5% / 실행 중: true / 콩뭉
+  </script>
+  <div class="note"><b>실험해 보기:</b> <code>val goalMinutes</code> 아래에 <code>goalMinutes = 60</code>을 써 보세요. 실행 전에 "Val cannot be reassigned" 오류가 납니다. <code>val</code>이 지켜 주는 것입니다.</div>
+
+  <h3>예제 2. 조건문 <code>if</code> / <code>when</code></h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex2.kt" data-run="d1_ex2">
+fun main() {
+    val studyMinutes = 75
+
+    // if - else if - else : 위에서부터 검사해서 처음 맞는 곳 하나만 실행
+    if (studyMinutes < 30) {
+        println("아직 뭉이 나오지 않아요.")
+    } else if (studyMinutes < 60) {
+        println("뭉이 나올 수 있어요!")
+    } else {
+        println("오래 공부했네요. 좋은 뭉이 나올지도?")
+    }
+
+    // if는 값을 만들기도 한다 → 결과를 변수에 바로 담기
+    val canGetMung = if (studyMinutes >= 30) "가능" else "불가능"
+    println("뭉 뽑기: $canGetMung")
+
+    // when { 조건 -> 값 } : 갈래가 많을 때 if보다 읽기 쉽다
+    val bracket = when {
+        studyMinutes < 30 -> "뽑기 불가"
+        studyMinutes < 60 -> "30분 구간"
+        studyMinutes < 120 -> "60분 구간"
+        studyMinutes < 180 -> "120분 구간"
+        else -> "180분 구간"              // 위에서 하나도 안 맞을 때
+    }
+    println("확률표 구간: $bracket")
+
+    // when (값) { 후보 -> 결과 } : 값이 무엇과 같은지로 고르기
+    val grade = "희귀"
+    val stars = when (grade) {
+        "일반" -> "★"
+        "희귀" -> "★★"
+        "영웅" -> "★★★"
+        "전설" -> "★★★★"
+        else -> "?"
+    }
+    println("$grade 등급 $stars")
+
+    // 비교: == != < <= > >=   논리: &&(그리고) ||(또는) !(아니다)
+    val isWeekend = false
+    if (studyMinutes >= 60 && !isWeekend) {
+        println("평일에 1시간 이상! 대단해요.")
+    }
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d1_ex2">
+오래 공부했네요. 좋은 뭉이 나올지도?
+뭉 뽑기: 가능
+확률표 구간: 60분 구간
+희귀 등급 ★★
+평일에 1시간 이상! 대단해요.
+  </script>
+
+  <h3>예제 3. 반복문 <code>for</code> / <code>while</code></h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex3.kt" data-run="d1_ex3">
+fun main() {
+    // 1..3 : 1부터 3까지 (3 포함)
+    for (day in 1..3) {
+        println("Day $day 공부 완료!")
+    }
+
+    // until : 끝 숫자는 포함하지 않는다 → 0, 1, 2
+    for (index in 0 until 3) {
+        println("인덱스 $index")
+    }
+
+    // downTo + step : 10부터 0까지 5씩 줄이기
+    for (second in 10 downTo 0 step 5) {
+        println("카운트다운 $second")
+    }
+
+    // 반복하며 값을 쌓기: 하루 40분씩 7일
+    var totalMinutes = 0
+    for (day in 1..7) {
+        totalMinutes += 40
+    }
+    // 나누기(/)는 몫, 나머지(%)는 나눈 나머지
+    println("일주일 합계: ${totalMinutes}분 = ${totalMinutes / 60}시간 ${totalMinutes % 60}분")
+
+    // while : 조건이 참인 동안 계속
+    var remaining = 30          // 뭉까지 남은 분
+    var sessions = 0            // 공부한 횟수
+    while (remaining > 0) {
+        remaining -= 12         // 한 번에 12분씩 공부 → 언젠가 0 이하가 되어 반복이 끝난다
+        sessions++              // 1 증가 (sessions = sessions + 1)
+    }
+    println("12분씩 ${sessions}번 공부하면 30분을 넘겨요.")
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d1_ex3">
+Day 1 공부 완료!
+Day 2 공부 완료!
+Day 3 공부 완료!
+인덱스 0
+인덱스 1
+인덱스 2
+카운트다운 10
+카운트다운 5
+카운트다운 0
+일주일 합계: 280분 = 4시간 40분
+12분씩 3번 공부하면 30분을 넘겨요.
+  </script>
+
+  <h3>예제 4. 함수</h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex4.kt" data-run="d1_ex4">
+// fun 이름(재료: 타입): 결과타입 { ... }
+fun toMinutes(seconds: Long): Long {
+    return seconds / 60
+}
+
+// 한 줄짜리 함수는 = 로 줄여 쓴다 (단일 식 함수)
+fun canGetMung(studyMinutes: Long): Boolean = studyMinutes >= 30
+
+// 매개변수 기본값: 넘기지 않으면 name은 "뭉", times는 1
+fun cheer(name: String = "뭉", times: Int = 1): String {
+    return "$name 화이팅" + "!".repeat(times)    // "!"를 times번 이어 붙인다
+}
+
+// 돌려줄 값이 없는 함수는 결과 타입을 생략한다
+fun printLine() {
+    println("--------------------")
+}
+
+fun main() {
+    val minutes = toMinutes(2700)               // 2700초 → 45분
+    println("공부 시간: ${minutes}분")
+    println("뭉 뽑기 가능? ${canGetMung(minutes)}")
+    printLine()
+    println(cheer())                            // 기본값 사용
+    println(cheer("지우", 2))                   // 순서대로 전달
+    println(cheer(times = 3))                   // 이름을 붙여 원하는 것만 전달
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d1_ex4">
+공부 시간: 45분
+뭉 뽑기 가능? true
+--------------------
+뭉 화이팅!
+지우 화이팅!!
+뭉 화이팅!!!
+  </script>
+
+  <h3>예제 5. null 안전성</h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex5.kt" data-run="d1_ex5">
+// 30분 미만이면 뭉이 없다 → "없음"을 null로 표현하고, 결과 타입에 ? 를 붙인다
+fun drawMungName(studyMinutes: Int): String? {
+    if (studyMinutes < 30) return null
+    return "콩뭉"
+}
+
+fun main() {
+    val a: String = "콩뭉"
+    // val wrong: String = null     // 컴파일 오류! String에는 null을 담을 수 없다
+    val b: String? = null           // String? = "문자열 또는 null"
+    println("$a / $b")
+
+    val mung: String? = drawMungName(45)
+    val nothing: String? = drawMungName(10)
+
+    // ?. (안전 호출): null이 아니면 실행, null이면 그냥 null
+    println(mung?.length)
+    println(nothing?.length)
+
+    // ?: (엘비스 연산자): 왼쪽이 null이면 오른쪽 값을 대신 사용
+    println(mung ?: "뭉이 나오지 않았어요")
+    println(nothing ?: "뭉이 나오지 않았어요")
+
+    // null 검사를 통과한 중괄호 안에서는 일반 String처럼 쓸 수 있다 (스마트 캐스트)
+    if (mung != null) {
+        println("${mung}을 얻었어요! 이름은 ${mung.length}글자")
+    }
+
+    // !! : "절대 null 아님!" 이라고 우기기. 실제로 null이면 앱이 죽는다 → 되도록 쓰지 않는다
+    // println(nothing!!.length)    // 주석을 풀고 실행하면 NullPointerException
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d1_ex5">
+콩뭉 / null
+2
+null
+콩뭉
+뭉이 나오지 않았어요
+콩뭉을 얻었어요! 이름은 2글자
+  </script>
+</section>
+
+<section class="sec" data-sec="studio">
+  <p>오늘은 두 가지를 합니다. <b>① Kotlin Playground로 코드 실행하기</b>(바로 시작), <b>② 안드로이드 스튜디오 설치와 프로젝트 만들어 두기</b>(내려받는 동안 ①로 공부).</p>
+
+  <h3>A. Kotlin Playground에서 코드 실행하기</h3>
+  <ol class="steps">
+    <li>브라우저에서 <a href="https://play.kotlinlang.org" target="_blank" rel="noopener">play.kotlinlang.org</a>를 엽니다.</li>
+    <li>편집 영역에 이미 있는 코드를 지우고 예제를 타이핑합니다. 모든 예제는 <code>fun main()</code>이 하나 있어야 실행됩니다.</li>
+    <li>오른쪽 위의 <b>Run</b>(▶) 버튼을 누르면 아래쪽에 결과가 나옵니다.</li>
+    <li>빨간 물결 밑줄이 보이면 오류입니다. 밑줄에 마우스를 올리면 이유가 나옵니다. 실행 결과 창의 오류 메시지에서 <b>줄 번호</b>를 먼저 확인하세요.</li>
+  </ol>
+
+  <h3>B. 안드로이드 스튜디오 설치</h3>
+  <ol class="steps">
+    <li><a href="https://developer.android.com/studio" target="_blank" rel="noopener">developer.android.com/studio</a>에서 <b>Download Android Studio</b>를 눌러 설치 파일을 받습니다.</li>
+    <li><b>Windows</b>: 받은 <code>.exe</code>를 실행하고 <span class="menu-path">Next → Next → Install</span>. <b>macOS</b>: <code>.dmg</code>를 열어 Android Studio 아이콘을 Applications 폴더로 끌어다 놓습니다(Apple Silicon/Intel 중 내 맥에 맞는 파일을 받으세요).</li>
+    <li>처음 실행하면 <b>Setup Wizard</b>가 뜹니다. 설치 유형은 <b>Standard</b>를 고르고, 라이선스 화면에서 각 항목을 <b>Accept</b>한 뒤 <b>Finish</b>. Android SDK와 에뮬레이터를 내려받습니다(10~30분).</li>
+    <li>"Welcome to Android Studio" 창이 보이면 설치 완료입니다.</li>
+  </ol>
+
+  <h3>C. 프로젝트 「MungTimer」 만들어 두기</h3>
+  <p>앱 코드는 Day 3부터 쓰지만, <b>첫 프로젝트 생성은 내려받을 것이 많아 오래 걸리므로 오늘 미리</b> 해 둡니다.</p>
+  <ol class="steps">
+    <li>Welcome 창에서 <span class="menu-path">New Project</span>를 누릅니다.</li>
+    <li>왼쪽 <b>Phone and Tablet</b>에서 <b>Empty Activity</b>를 고르고 <b>Next</b>. (주의: "Empty <u>Views</u> Activity"가 아닙니다. Compose 로고가 있는 <b>Empty Activity</b>입니다.)</li>
+    <li>아래 표대로 입력하고 <b>Finish</b>.
+      <div class="table-wrap"><table>
+        <tr><th>항목</th><th>입력할 값</th><th>이유</th></tr>
+        <tr><td>Name</td><td><code>MungTimer</code></td><td>앱(프로젝트) 이름</td></tr>
+        <tr><td>Package name</td><td><code>com.example.mungtimer</code></td><td>앱의 고유 주소. <b>이 사이트의 모든 코드가 이 이름을 씁니다.</b> 다르게 지으면 코드 첫 줄의 <code>package</code>와 <code>import</code>를 매번 고쳐야 합니다.</td></tr>
+        <tr><td>Save location</td><td>한글·공백 없는 경로</td><td>예: <code>C:\dev\MungTimer</code></td></tr>
+        <tr><td>Minimum SDK</td><td><b>API 26</b> (Android 8.0)</td><td>날짜 계산(<code>java.time</code>)을 추가 설정 없이 쓰기 위해서입니다. 요즘 폰은 거의 다 해당됩니다.</td></tr>
+        <tr><td>Build configuration language</td><td><b>Kotlin DSL</b> (기본값)</td><td>빌드 설정 파일도 코틀린 문법으로 씁니다.</td></tr>
+      </table></div>
+    </li>
+    <li>프로젝트가 열리면 아래쪽 상태 표시줄에 진행 막대가 돌아갑니다(<b>Gradle Sync</b>). 필요한 라이브러리를 내려받는 중이니 <b>끝날 때까지 기다립니다</b>(첫 회 5~20분). 이 동안 Playground에서 예제를 계속하세요.</li>
+    <li>왼쪽 파일 목록에 <code>app</code> 폴더가 보이고 진행 막대가 사라지면 준비 끝입니다. 오늘은 여기까지만 하고 닫아도 됩니다.</li>
+  </ol>
+  <div class="note warn"><b>Sync가 실패했다면</b> — 대부분 네트워크 문제입니다. 위쪽에 뜨는 <b>Try Again</b>을 누르거나, 메뉴 <span class="menu-path">File → Sync Project with Gradle Files</span>를 다시 실행하세요. 회사/학교 네트워크라면 집 Wi-Fi나 휴대폰 테더링으로 바꿔 보세요.</div>
+
+  <h3>D. 화면 구성 한눈에 보기</h3>
+  <div class="table-wrap"><table>
+    <tr><th>위치</th><th>이름</th><th>하는 일</th></tr>
+    <tr><td>왼쪽</td><td><b>Project</b> 창</td><td>파일 목록. 위쪽 드롭다운이 <b>Android</b>로 되어 있으면 필요한 파일만 정리해서 보여 줍니다.</td></tr>
+    <tr><td>가운데</td><td>편집기</td><td>코드를 쓰는 곳. 파일마다 탭이 생깁니다.</td></tr>
+    <tr><td>위쪽</td><td>툴바</td><td>실행할 기기 선택, <b>Run ▶</b> 버튼.</td></tr>
+    <tr><td>아래쪽</td><td>도구 창</td><td><b>Build</b>(빌드 결과), <b>Logcat</b>(앱이 남기는 기록), <b>Terminal</b>.</td></tr>
+  </table></div>
+
+  <h3>오늘의 단축키</h3>
+  <div class="table-wrap"><table>
+    <tr><th>기능</th><th>Windows / Linux</th><th>macOS</th></tr>
+    <tr><td>무엇이든 찾기 (파일, 메뉴, 설정)</td><td><kbd>Shift</kbd> 두 번</td><td><kbd>Shift</kbd> 두 번</td></tr>
+    <tr><td>자동 완성 목록 띄우기</td><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td></tr>
+    <tr><td>한 줄 주석 켜기/끄기</td><td><kbd>Ctrl</kbd>+<kbd>/</kbd></td><td><kbd>Cmd</kbd>+<kbd>/</kbd></td></tr>
+    <tr><td>현재 줄 복제</td><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td><kbd>Cmd</kbd>+<kbd>D</kbd></td></tr>
+    <tr><td>되돌리기</td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td><kbd>Cmd</kbd>+<kbd>Z</kbd></td></tr>
+  </table></div>
+  <div class="note">메뉴 위치가 기억나지 않으면 <kbd>Shift</kbd>를 두 번 눌러 이름을 검색하세요. 예: "Sync Project", "Logcat". 안드로이드 스튜디오는 버전마다 메뉴 위치가 조금씩 바뀌지만 <b>이름 검색은 항상 통합니다.</b></div>
+</section>
+
+<section class="sec" data-sec="quiz">
+  <div class="q" data-type="mc" data-answer="3">
+    <p class="q-title">다음 코드를 실행하면 어떻게 될까요?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+val goalMinutes = 30
+goalMinutes = 60
+println(goalMinutes)
+    </script>
+    <ul class="q-options">
+      <li>30이 출력된다</li>
+      <li>60이 출력된다</li>
+      <li>실행 전에 오류가 난다 (val은 다시 대입할 수 없다)</li>
+      <li>실행 도중 앱이 멈춘다</li>
+    </ul>
+    <div class="q-explain"><p><code>val</code>은 뚜껑을 붙인 상자입니다. 값을 바꾸려면 처음부터 <code>var</code>로 선언해야 합니다. 코틀린은 이런 실수를 <b>실행하기 전(컴파일 단계)</b>에 잡아 줍니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="var">
+    <p class="q-title">공부할 때마다 늘어나는 값입니다. 빈칸에 들어갈 키워드는?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+____ studyMinutes = 0
+studyMinutes += 25
+    </script>
+    <div class="q-explain"><p>값이 바뀌어야 하므로 <code>var</code>입니다. <code>+=</code>는 <code>studyMinutes = studyMinutes + 25</code>를 줄여 쓴 것입니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="2">
+    <p class="q-title">출력 결과로 알맞은 것은?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+val minutes = 45
+println("남은 시간: ${60 - minutes}분")
+    </script>
+    <ul class="q-options">
+      <li>남은 시간: ${60 - minutes}분</li>
+      <li>남은 시간: 15분</li>
+      <li>남은 시간: 60 - 45분</li>
+      <li>오류가 난다</li>
+    </ul>
+    <div class="q-explain"><p><code>${ }</code> 안의 식은 <b>계산된 결과</b>가 문자열에 들어갑니다. 60 − 45 = 15.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="1">
+    <p class="q-title"><code>println</code>은 몇 번 실행될까요?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+for (i in 0 until 4) {
+    println(i)
+}
+    </script>
+    <ul class="q-options">
+      <li>4번 (0, 1, 2, 3)</li>
+      <li>5번 (0, 1, 2, 3, 4)</li>
+      <li>3번 (1, 2, 3)</li>
+      <li>끝나지 않는다</li>
+    </ul>
+    <div class="q-explain"><p><code>until</code>은 끝 숫자를 <b>포함하지 않습니다</b>. <code>0..4</code>였다면 5번입니다. 목록의 위치(인덱스)는 0부터 시작하므로 <code>0 until 크기</code> 형태를 자주 씁니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="Boolean">
+    <p class="q-title">30분 이상인지 참/거짓으로 돌려주는 함수입니다. 빈칸에 들어갈 결과 타입은?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+fun canGetMung(studyMinutes: Long): ____ = studyMinutes >= 30
+    </script>
+    <div class="q-explain"><p><code>&gt;=</code> 비교의 결과는 <code>true</code> 또는 <code>false</code>이므로 타입은 <code>Boolean</code>입니다. (대소문자를 구분합니다.)</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="4">
+    <p class="q-title">출력 결과는?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+val mungName: String? = null
+println(mungName?.length ?: 0)
+    </script>
+    <ul class="q-options">
+      <li>null</li>
+      <li>오류가 나서 앱이 멈춘다</li>
+      <li>4</li>
+      <li>0</li>
+    </ul>
+    <div class="q-explain"><p><code>mungName?.length</code>는 <code>mungName</code>이 null이라 null이 되고, <code>?:</code>가 null 대신 오른쪽의 <code>0</code>을 내놓습니다. <code>?.</code>와 <code>?:</code>는 이렇게 짝으로 자주 씁니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="?:">
+    <p class="q-title">닉네임을 입력하지 않았으면(null) "이름 없는 뭉"을 쓰려고 합니다. 빈칸에 들어갈 연산자는?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+val input: String? = null
+val nickname = input ____ "이름 없는 뭉"
+    </script>
+    <div class="q-explain"><p>엘비스 연산자 <code>?:</code>입니다. 왼쪽이 null이 아니면 왼쪽 값, null이면 오른쪽 값이 됩니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="2">
+    <p class="q-title"><code>studyMinutes</code>가 60일 때 <code>message</code>에 담기는 값은?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+val message = when {
+    studyMinutes < 30 -> "A"
+    studyMinutes < 60 -> "B"
+    studyMinutes < 120 -> "C"
+    else -> "D"
+}
+    </script>
+    <ul class="q-options">
+      <li>"B"</li>
+      <li>"C"</li>
+      <li>"D"</li>
+      <li>"B"와 "C" 둘 다</li>
+    </ul>
+    <div class="q-explain"><p>60은 <code>&lt; 60</code>이 아니므로 "B"를 지나치고, <code>&lt; 120</code>에 처음 맞아 "C"가 됩니다. <code>when</code>은 위에서부터 <b>처음 맞는 한 갈래</b>만 실행합니다. 경계값(30, 60, 120)은 버그가 자주 숨는 곳이니 항상 직접 넣어 확인하세요.</p></div>
+  </div>
+</section>
+
+<section class="sec" data-sec="task">
+  <h3>과제: 타이머의 "두뇌" 만들기</h3>
+  <p>타이머 화면에 필요한 계산을 순수 코틀린 함수로 먼저 만듭니다. Kotlin Playground에서 작성하고, 완성한 코드는 <b>메모장 등에 저장</b>해 두세요. Day 3에서 앱에 그대로 옮깁니다.</p>
+
+  <h4>요구사항 체크리스트</h4>
+  <ul class="checklist">
+    <li><code>formatTime(totalSeconds: Long): String</code> — 초를 <code>"HH:MM:SS"</code> 형태로 바꾼다. 예: 75 → <code>"00:01:15"</code>, 3661 → <code>"01:01:01"</code></li>
+    <li><code>canGetMung(studySeconds: Long): Boolean</code> — 30분(1800초) 이상이면 <code>true</code></li>
+    <li><code>minutesUntilMung(studySeconds: Long): Long?</code> — 뭉까지 남은 분을 돌려준다. 이미 30분을 넘겼으면 <code>null</code>. 1초라도 남았으면 올림해서 1분</li>
+    <li><code>resultMessage(studySeconds: Long): String</code> — 30분 이상이면 축하 메시지, 미만이면 "N분만 더 하면…" 안내 메시지</li>
+    <li><code>main()</code>에서 <code>for</code>문으로 0분, 10분, 20분, 30분, 40분을 넣어 결과를 출력해 확인한다</li>
+    <li>경계값 확인: 29분 59초는 "1분만 더", 30분 0초는 축하 메시지가 나온다</li>
+  </ul>
+
+  <details class="hint"><summary>힌트 1 — 시·분·초 나누기</summary>
+    <p>1시간은 3600초입니다. <code>시 = 전체초 / 3600</code>, <code>분 = (전체초 % 3600) / 60</code>, <code>초 = 전체초 % 60</code>. 정수끼리 나누면 소수점 아래는 버려집니다.</p>
+  </details>
+  <details class="hint"><summary>힌트 2 — 7을 "07"로 만들기</summary>
+    <p><code>7.toString().padStart(2, '0')</code>은 "글자 수가 2가 될 때까지 앞을 '0'으로 채워라"는 뜻입니다. 이 한 줄을 <code>twoDigits()</code>라는 작은 함수로 만들어 세 번 재사용해 보세요.</p>
+  </details>
+  <details class="hint"><summary>힌트 3 — 올림과 null 다루기</summary>
+    <p>남은 초를 분으로 올림하려면 <code>(남은초 + 59) / 60</code>을 쓰면 됩니다. <code>resultMessage</code>에서는 <code>minutesUntilMung()</code>의 결과가 <code>null</code>인지 <code>if</code>로 검사해 두 메시지 중 하나를 고르세요.</p>
+  </details>
+
+  <details class="answer"><summary>모범 답안 보기</summary>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="Day1Task.kt" data-run="d1_task">
+// 뭉을 뽑을 수 있는 최소 공부 시간(초). const val = 프로그램 전체에서 쓰는 고정된 값(상수)
+const val MIN_SECONDS_FOR_MUNG = 30 * 60L
+
+// 한 자리 숫자 앞에 0을 붙여 두 자리로: 7 → "07"
+fun twoDigits(number: Long): String = number.toString().padStart(2, '0')
+
+// 초 → "HH:MM:SS"
+fun formatTime(totalSeconds: Long): String {
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return "${twoDigits(hours)}:${twoDigits(minutes)}:${twoDigits(seconds)}"
+}
+
+// 30분 이상 공부했는가?
+fun canGetMung(studySeconds: Long): Boolean = studySeconds >= MIN_SECONDS_FOR_MUNG
+
+// 뭉까지 남은 시간(분). 이미 넘겼으면 null
+fun minutesUntilMung(studySeconds: Long): Long? {
+    if (canGetMung(studySeconds)) return null
+    val remainingSeconds = MIN_SECONDS_FOR_MUNG - studySeconds
+    return (remainingSeconds + 59) / 60          // 올림: 1초만 남아도 1분
+}
+
+// 종료했을 때 보여 줄 메시지
+fun resultMessage(studySeconds: Long): String {
+    val remaining = minutesUntilMung(studySeconds)
+    return if (remaining == null) {
+        "${formatTime(studySeconds)} 공부 완료! 뭉이 나와요 🎉"
+    } else {
+        "${formatTime(studySeconds)} 공부했어요. ${remaining}분만 더 하면 뭉을 만날 수 있어요!"
+    }
+}
+
+fun main() {
+    println(formatTime(0))
+    println(formatTime(75))
+    println(formatTime(3661))
+
+    for (minutes in 0..40 step 10) {
+        println(resultMessage(minutes * 60L))
+    }
+
+    println(resultMessage(29 * 60L + 59))        // 경계값: 29분 59초
+}
+    </script>
+    <script type="text/plain" class="code" data-lang="output" data-for="d1_task">
+00:00:00
+00:01:15
+01:01:01
+00:00:00 공부했어요. 30분만 더 하면 뭉을 만날 수 있어요!
+00:10:00 공부했어요. 20분만 더 하면 뭉을 만날 수 있어요!
+00:20:00 공부했어요. 10분만 더 하면 뭉을 만날 수 있어요!
+00:30:00 공부 완료! 뭉이 나와요 🎉
+00:40:00 공부 완료! 뭉이 나와요 🎉
+00:29:59 공부했어요. 1분만 더 하면 뭉을 만날 수 있어요!
+    </script>
+    <p><b>확인 포인트:</b> ① 상수 <code>MIN_SECONDS_FOR_MUNG</code>을 한 곳에 두었기 때문에, 나중에 "테스트할 때만 10초"로 바꾸기 쉽습니다. ② <code>minutesUntilMung</code>이 <code>Long?</code>를 돌려주므로, 쓰는 쪽은 null 검사를 <b>하지 않으면 컴파일이 안 됩니다</b>. 이것이 null 안전성입니다.</p>
+  </details>
+</section>
+
+</template>
+
+<!-- ===================== Day 2 : 코틀린 핵심 ===================== -->
+<template id="page-day2">
+
+<section class="sec" data-sec="goal">
+  <p>어제는 숫자와 글자 하나하나를 다뤘습니다. 오늘은 여러 값을 <b>하나의 덩어리(객체)</b>로 묶고, 그 덩어리 여러 개를 <b>목록(컬렉션)</b>으로 다루는 법을 배웁니다. 앱의 데이터는 전부 이 방식으로 표현됩니다.</p>
+  <h3>오늘이 끝나면 할 수 있는 것</h3>
+  <ul>
+    <li><code>class</code>와 <code>data class</code>로 나만의 타입을 만들 수 있다.</li>
+    <li><code>enum class</code>로 "정해진 몇 가지 중 하나"를 표현할 수 있다.</li>
+    <li><code>List</code>와 <code>Map</code>에 데이터를 담고 꺼낼 수 있다.</li>
+    <li>람다와 <code>filter</code> · <code>map</code> · <code>sortedByDescending</code> · <code>sumOf</code>로 목록을 가공할 수 있다.</li>
+    <li>안드로이드 스튜디오에서 패키지와 코틀린 파일을 만들 수 있다.</li>
+  </ul>
+  <div class="link-app">
+    <div class="ico">🔗</div>
+    <div><b>최종 앱과의 연결</b>
+    오늘 과제로 만드는 <code>MungGrade</code>(등급 enum), <code>Mung</code>(data class), <code>MungCatalog</code>(전체 뭉 목록)는 <b>앱에 그대로 들어가는 실제 코드</b>입니다. 뭉 도감은 <code>filter</code>로, 그룹 랭킹은 <code>sortedByDescending</code>으로, 이번 주 공부 시간은 <code>sumOf</code>로 만듭니다.</div>
+  </div>
+</section>
+
+<section class="sec" data-sec="concept">
+  <h3>1. 클래스와 객체</h3>
+  <div class="note analogy"><b>비유 — 붕어빵 틀과 붕어빵.</b> <code>class</code>는 <b>틀(설계도)</b>이고, 그 틀로 찍어 낸 실제 붕어빵 하나하나가 <b>객체</b>입니다. 틀은 하나지만 붕어빵은 몇 개든 만들 수 있고, 붕어빵마다 속(값)은 다를 수 있습니다.</div>
+  <ul>
+    <li><b>프로퍼티</b>: 객체가 가진 값. (타이머의 "지금까지 흐른 초")</li>
+    <li><b>메서드</b>: 객체가 할 수 있는 동작 = 클래스 안의 함수. (타이머의 "시간 더하기")</li>
+    <li><b>생성자</b>: 객체를 만들 때 받는 값. <code>class StudyTimer(val owner: String)</code>의 괄호 부분.</li>
+  </ul>
+
+  <h3>2. <code>data class</code>: 값을 담는 상자 전용 클래스</h3>
+  <p>앱에서 만드는 클래스의 대부분은 "값 몇 개를 묶어 다니는 것"이 목적입니다. 앞에 <code>data</code>를 붙이면 코틀린이 유용한 기능을 자동으로 만들어 줍니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>자동으로 생기는 것</th><th>효과</th></tr>
+    <tr><td><code>toString()</code></td><td><code>println(mung)</code> 하면 <code>Mung(id=1, name=콩뭉…)</code>처럼 내용이 보인다</td></tr>
+    <tr><td><code>equals()</code> (<code>==</code>)</td><td>내용이 같으면 같은 것으로 판단한다</td></tr>
+    <tr><td><code>copy()</code></td><td>일부 값만 바꾼 <b>복사본</b>을 만든다. Day 4의 화면 상태 갱신에서 핵심</td></tr>
+  </table></div>
+
+  <h3>3. <code>enum class</code>: 정해진 보기 중 하나</h3>
+  <div class="note analogy"><b>비유 — 신호등.</b> 신호등 색은 빨강·노랑·초록 셋뿐입니다. "보라색"은 존재할 수 없습니다. 뭉 등급도 일반·희귀·영웅·전설 넷뿐입니다.</div>
+  <p>등급을 <code>"희귀"</code>라는 문자열로 다루면 <code>"희기"</code> 같은 오타를 아무도 막아 주지 않습니다. <code>enum</code>으로 만들면 <code>MungGrade.RARE</code>처럼 <b>정해진 이름만</b> 쓸 수 있고, 오타는 빨간 줄로 바로 드러납니다. 또 <code>when</code>에서 모든 경우를 다뤘는지 코틀린이 검사해 줍니다.</p>
+
+  <h3>4. <code>object</code>: 딱 하나만 있는 객체</h3>
+  <p>"전체 뭉 목록"은 앱에 하나만 있으면 됩니다. <code>object MungCatalog { … }</code>로 만들면 따로 생성하지 않고 <code>MungCatalog.all</code>처럼 이름으로 바로 씁니다.</p>
+
+  <h3>5. 컬렉션: <code>List</code>와 <code>Map</code></h3>
+  <div class="table-wrap"><table>
+    <tr><th>종류</th><th>비유</th><th>만들기</th><th>꺼내기</th></tr>
+    <tr><td><code>List</code></td><td>번호표가 붙은 줄 (0번부터)</td><td><code>listOf(40, 0, 95)</code></td><td><code>list[0]</code></td></tr>
+    <tr><td><code>Map</code></td><td>사전: 단어(key) → 뜻(value)</td><td><code>mapOf("희귀" to 25)</code></td><td><code>map["희귀"]</code> (없으면 null)</td></tr>
+  </table></div>
+  <p><code>listOf</code> / <code>mapOf</code>는 <b>읽기 전용</b>입니다. 넣고 빼야 한다면 <code>mutableListOf</code> / <code>mutableMapOf</code>를 씁니다. <code>val</code>/<code>var</code>와 같은 습관: <b>일단 읽기 전용으로, 필요할 때만 mutable.</b></p>
+
+  <h3>6. 람다: 이름 없는 작은 함수</h3>
+  <div class="note analogy"><b>비유 — 심부름 쪽지.</b> 목록에게 "이 쪽지에 적힌 대로 골라 줘" 하고 건네는 쪽지가 람다입니다. <code>members.filter { it.todayMinutes &gt; 0 }</code>는 "멤버 한 명 한 명에게 '오늘 공부했나요?'를 물어서 '예'인 사람만 남겨 줘"라는 뜻입니다.</div>
+  <ul>
+    <li>모양: <code>{ 재료 -&gt; 결과 }</code>. 재료가 하나면 이름을 생략하고 <code>it</code>이라고 부릅니다.</li>
+    <li>함수의 <b>마지막 인자가 람다</b>면 괄호 밖으로 뺍니다: <code>list.filter { … }</code>. Day 3의 Compose 코드가 전부 이 모양입니다.</li>
+  </ul>
+  <div class="table-wrap"><table>
+    <tr><th>함수</th><th>하는 일</th><th>뭉타이머에서</th></tr>
+    <tr><td><code>filter { 조건 }</code></td><td>조건에 맞는 것만 남긴다</td><td>희귀 등급 뭉만 보기</td></tr>
+    <tr><td><code>map { 변환 }</code></td><td>하나하나를 다른 값으로 바꾼다</td><td>뭉 목록 → 이름 목록</td></tr>
+    <tr><td><code>sortedByDescending { 기준 }</code></td><td>기준이 큰 것부터 정렬</td><td>공부 시간 랭킹</td></tr>
+    <tr><td><code>sumOf { 값 }</code></td><td>값을 모두 더한다</td><td>이번 주 공부 시간 합계</td></tr>
+    <tr><td><code>count { 조건 }</code></td><td>조건에 맞는 개수</td><td>도감에서 모은 뭉 수</td></tr>
+    <tr><td><code>firstOrNull { 조건 }</code></td><td>처음 맞는 것 하나, 없으면 null</td><td>id로 뭉 찾기</td></tr>
+    <tr><td><code>groupBy { 기준 }</code></td><td>기준별로 묶어 Map으로</td><td>등급별로 뭉 묶기</td></tr>
+    <tr><td><code>random()</code></td><td>아무거나 하나</td><td>뭉 뽑기</td></tr>
+  </table></div>
+</section>
+
+<section class="sec" data-sec="example">
+  <p>오늘도 <a href="https://play.kotlinlang.org" target="_blank" rel="noopener">Kotlin Playground</a>에서 실행합니다.</p>
+
+  <h3>예제 1. <code>class</code>와 <code>data class</code></h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex1.kt" data-run="d2_ex1">
+// class: 값(프로퍼티)과 동작(메서드)을 묶은 설계도
+class StudyTimer(val owner: String) {      // 괄호 안 = 생성자. 만들 때 주인 이름을 받는다
+    var seconds = 0L                       // 프로퍼티: 지금까지 쌓인 초
+
+    fun add(moreSeconds: Long) {           // 메서드: 시간을 더한다
+        seconds += moreSeconds
+    }
+
+    fun minutes(): Long = seconds / 60     // 메서드: 분으로 바꿔 돌려준다
+}
+
+// data class: 값을 담는 것이 목적인 클래스 → toString / equals / copy 가 자동으로 생긴다
+data class Mung(val id: Int, val name: String, val grade: String)
+
+fun main() {
+    val timer = StudyTimer("지우")          // 설계도로 실제 객체를 만든다 (new 같은 키워드는 없다)
+    timer.add(600)                          // 점(.)으로 메서드를 부른다
+    timer.add(1500)
+    println("${timer.owner}의 공부 시간: ${timer.minutes()}분")
+
+    val a = Mung(1, "콩뭉", "일반")
+    val b = Mung(1, "콩뭉", "일반")
+    println(a)                              // toString: 내용이 보기 좋게 나온다
+    println(a == b)                         // equals: 내용이 같으면 true
+
+    // copy: 일부만 바꾼 "복사본"을 만든다. 원본 a는 그대로
+    val shiny = a.copy(name = "빛나는 콩뭉", grade = "희귀")
+    println(shiny)
+    println(a.name)
+
+    // 일반 class는 내용이 같아도 서로 다른 물건으로 본다
+    val timer1 = StudyTimer("민서")
+    val timer2 = StudyTimer("민서")
+    println(timer1 == timer2)
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d2_ex1">
+지우의 공부 시간: 35분
+Mung(id=1, name=콩뭉, grade=일반)
+true
+Mung(id=1, name=빛나는 콩뭉, grade=희귀)
+콩뭉
+false
+  </script>
+
+  <h3>예제 2. <code>enum class</code></h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex2.kt" data-run="d2_ex2">
+// 등급은 딱 4가지. 각 등급이 자기만의 값(label, stars)을 가질 수 있다
+enum class MungGrade(val label: String, val stars: Int) {
+    COMMON("일반", 1),
+    RARE("희귀", 2),
+    EPIC("영웅", 3),
+    LEGENDARY("전설", 4)
+}
+
+// when으로 enum을 다루면 else가 필요 없다: 4가지를 모두 다뤘는지 코틀린이 검사한다
+fun cheerFor(grade: MungGrade): String = when (grade) {
+    MungGrade.COMMON -> "귀여운 뭉이에요."
+    MungGrade.RARE -> "오, 희귀한 뭉!"
+    MungGrade.EPIC -> "대단해요, 영웅 뭉!"
+    MungGrade.LEGENDARY -> "전설의 뭉이 나타났다!!"
+}
+
+fun main() {
+    val grade = MungGrade.EPIC
+    println(grade)                          // 이름 그대로 출력
+    println(grade.label)                    // 등급이 가진 값 꺼내기
+    println(cheerFor(grade))
+
+    // entries: 모든 등급이 선언한 순서대로 들어 있는 목록
+    for (g in MungGrade.entries) {
+        val stars = "★".repeat(g.stars)
+        println("${g.ordinal}번 ${g.label} $stars")     // ordinal: 선언 순서(0부터)
+    }
+
+    // val wrong = MungGrade.RERE           // 오타는 컴파일 오류 → 문자열보다 안전
+    println(MungGrade.RARE < MungGrade.EPIC)            // 선언 순서로 비교할 수 있다
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d2_ex2">
+EPIC
+영웅
+대단해요, 영웅 뭉!
+0번 일반 ★
+1번 희귀 ★★
+2번 영웅 ★★★
+3번 전설 ★★★★
+true
+  </script>
+
+  <h3>예제 3. 컬렉션 <code>List</code> / <code>Map</code></h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex3.kt" data-run="d2_ex3">
+fun main() {
+    // List: 순서가 있는 목록. listOf로 만들면 읽기 전용
+    val week = listOf(40, 0, 95, 30, 120, 15, 60)       // 월~일 공부한 분
+    println(week.size)                      // 개수
+    println(week[0])                        // 0번째(첫 번째) 값
+    println(week.last())                    // 마지막 값
+    println(week.sum())                     // 합계
+    println(week.max())                     // 가장 큰 값
+    println(0 in week)                      // 0이 들어 있는가?
+
+    // 위치(index)와 값을 함께 꺼내며 반복
+    for ((index, minutes) in week.withIndex()) {
+        if (minutes >= 60) println("${index}번째 날: ${minutes}분 👍")
+    }
+
+    // MutableList: 넣고 뺄 수 있는 목록
+    val owned = mutableListOf("콩뭉")
+    owned.add("딸기뭉")
+    owned.add("콩뭉")                       // 같은 값이 또 들어가도 된다
+    println(owned)
+    owned.remove("콩뭉")                    // 처음 만나는 "콩뭉" 하나만 뺀다
+    println(owned)
+
+    // Map: 열쇠(key) → 값(value). "A to B"는 한 쌍을 만든다
+    val rates = mapOf("일반" to 70, "희귀" to 25, "영웅" to 4, "전설" to 1)
+    println(rates["희귀"])                  // 열쇠로 값 꺼내기
+    println(rates["신화"])                  // 없는 열쇠 → null
+    println(rates["신화"] ?: 0)             // 그래서 ?: 와 함께 쓴다
+    for ((grade, percent) in rates) {
+        println("$grade: $percent%")
+    }
+    println(rates.values.sum())             // 값만 모아서 합계
+
+    // MutableMap: 뭉 이름별로 몇 마리인지 세기
+    val counts = mutableMapOf<String, Int>()
+    for (name in listOf("콩뭉", "딸기뭉", "콩뭉")) {
+        counts[name] = (counts[name] ?: 0) + 1
+    }
+    println(counts)
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d2_ex3">
+7
+40
+60
+360
+120
+true
+2번째 날: 95분 👍
+4번째 날: 120분 👍
+6번째 날: 60분 👍
+[콩뭉, 딸기뭉, 콩뭉]
+[딸기뭉, 콩뭉]
+25
+null
+0
+일반: 70%
+희귀: 25%
+영웅: 4%
+전설: 1%
+100
+{콩뭉=2, 딸기뭉=1}
+  </script>
+  <div class="note"><code>mutableMapOf&lt;String, Int&gt;()</code>의 <code>&lt; &gt;</code>는 "열쇠는 String, 값은 Int"라는 뜻입니다. 처음에 비어 있어서 코틀린이 타입을 추측할 수 없을 때 직접 알려 줍니다. <code>List&lt;Mung&gt;</code>은 "Mung이 들어 있는 목록"이라고 읽습니다.</div>
+
+  <h3>예제 4. 람다와 컬렉션 함수 (그룹 랭킹 미리보기)</h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex4.kt" data-run="d2_ex4">
+data class Member(val name: String, val todayMinutes: Int, val mungCount: Int)
+
+fun main() {
+    val members = listOf(
+        Member("지우", 190, 7),
+        Member("민서", 45, 2),
+        Member("하준", 0, 0),
+        Member("서연", 125, 5),
+    )
+
+    // 람다: 이름 없는 작은 함수. { 재료 -> 결과 }  변수에 담아 둘 수도 있다
+    val isHardWorker = { member: Member -> member.todayMinutes >= 60 }
+    println(isHardWorker(members[0]))
+
+    // filter: 조건이 true인 것만 남긴다
+    val studied = members.filter { member -> member.todayMinutes > 0 }
+    println(studied.size)
+
+    // 재료가 하나뿐이면 이름을 생략하고 it 이라고 부른다
+    val hardWorkers = members.filter { it.todayMinutes >= 60 }
+
+    // map: 하나하나를 다른 값으로 바꾼 새 목록
+    println(hardWorkers.map { it.name })
+
+    // sortedByDescending: 기준이 큰 것부터 정렬 → 랭킹
+    val ranking = members.sortedByDescending { it.todayMinutes }
+    for ((index, member) in ranking.withIndex()) {
+        println("${index + 1}위 ${member.name} ${member.todayMinutes}분")
+    }
+
+    // 점(.)으로 이어 붙이면 위에서 아래로 차례차례 가공된다
+    val topNames = members
+        .filter { it.todayMinutes > 0 }             // 공부한 사람만
+        .sortedByDescending { it.todayMinutes }     // 많이 한 순서로
+        .take(2)                                    // 앞에서 2명
+        .map { it.name }                            // 이름만
+    println(topNames)
+
+    println(members.sumOf { it.todayMinutes })              // 모두 더하기
+    println(members.count { it.mungCount == 0 })            // 조건에 맞는 개수
+    println(members.maxByOrNull { it.mungCount }?.name)     // 뭉이 가장 많은 사람
+    println(members.firstOrNull { it.name == "없는사람" })  // 못 찾으면 null
+    println(members.any { it.todayMinutes >= 180 })         // 한 명이라도 있는가
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d2_ex4">
+true
+3
+[지우, 서연]
+1위 지우 190분
+2위 서연 125분
+3위 민서 45분
+4위 하준 0분
+[지우, 서연]
+360
+1
+지우
+null
+true
+  </script>
+
+  <h3>예제 5. <code>object</code>와 랜덤 (뭉 뽑기 미리보기)</h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex5.kt" data-run="d2_ex5">
+import kotlin.random.Random
+
+enum class Grade { COMMON, RARE }
+data class Mung(val name: String, val grade: Grade)
+
+// object: 프로그램에 딱 하나만 있는 객체. 만들지 않고 이름으로 바로 쓴다
+object Catalog {
+    val all = listOf(
+        Mung("콩뭉", Grade.COMMON),
+        Mung("구름뭉", Grade.COMMON),
+        Mung("딸기뭉", Grade.RARE),
+        Mung("달뭉", Grade.RARE),
+    )
+
+    fun byGrade(grade: Grade): List<Mung> = all.filter { it.grade == grade }
+}
+
+fun main() {
+    println(Catalog.all.size)
+    println(Catalog.byGrade(Grade.RARE).map { it.name })
+
+    // groupBy: 기준별로 묶어서 Map<기준, 목록> 으로
+    val grouped = Catalog.all.groupBy { it.grade }
+    println(grouped[Grade.COMMON]?.size)
+
+    // random(): 목록에서 아무거나 하나
+    val picked = Catalog.byGrade(Grade.RARE).random()
+    println("뽑힌 뭉: ${picked.name}")
+
+    // Random.nextInt(100): 0 이상 100 미만의 정수 하나 → 확률 계산의 기본 (Day 5에서 사용)
+    val roll = Random.nextInt(100)
+    println(if (roll < 25) "25% 확률에 당첨!" else "다음 기회에…")
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d2_ex5">
+4
+[딸기뭉, 달뭉]
+2
+뽑힌 뭉: 달뭉          ← (랜덤) 실행할 때마다 달라져요
+다음 기회에…          ← (랜덤)
+  </script>
+</section>
+
+<section class="sec" data-sec="studio">
+  <p>오늘은 어제 만들어 둔 <b>MungTimer</b> 프로젝트에 <b>패키지와 코틀린 파일을 만드는 법</b>을 익힙니다. 과제의 결과물을 여기에 넣습니다.</p>
+
+  <h3>A. 프로젝트 열고 파일 위치 찾기</h3>
+  <ol class="steps">
+    <li>안드로이드 스튜디오를 실행하면 최근 프로젝트 목록에 <b>MungTimer</b>가 있습니다. 클릭해서 엽니다.</li>
+    <li>왼쪽 <b>Project</b> 창 위쪽의 드롭다운이 <b>Android</b>인지 확인합니다.</li>
+    <li><span class="menu-path">app → kotlin+java → com.example.mungtimer</span>를 펼칩니다. (버전에 따라 <code>java</code>라고만 보일 수 있습니다.) 같은 이름의 폴더가 세 개 보이는데, <b>뒤에 (androidTest)나 (test)가 붙지 않은 첫 번째</b>가 앱 코드 자리입니다. <code>MainActivity.kt</code>가 들어 있는 곳입니다.</li>
+  </ol>
+
+  <h3>B. 패키지(폴더) 만들기</h3>
+  <p>패키지는 관련 있는 파일을 모아 두는 <b>폴더</b>입니다. 뭉 데이터에 관한 파일은 <code>model</code> 패키지에 모읍니다.</p>
+  <ol class="steps">
+    <li><code>com.example.mungtimer</code>를 마우스 오른쪽 클릭 → <span class="menu-path">New → Package</span></li>
+    <li>입력 칸에 <code>com.example.mungtimer.model</code>이 되도록 끝에 <code>model</code>을 적고 <kbd>Enter</kbd>.</li>
+  </ol>
+
+  <h3>C. 코틀린 파일 만들기</h3>
+  <ol class="steps">
+    <li>방금 만든 <code>model</code>을 오른쪽 클릭 → <span class="menu-path">New → Kotlin Class/File</span></li>
+    <li>이름에 <code>MungGrade</code>를 쓰고, 아래 목록에서 <b>Enum class</b>를 고른 뒤 <kbd>Enter</kbd>. (<code>Mung</code>은 <b>Data class</b>, <code>MungCatalog</code>는 <b>Object</b>를 고릅니다.)</li>
+    <li>파일 첫 줄에 <code>package com.example.mungtimer.model</code>이 자동으로 들어갑니다. <b>이 줄은 지우지 마세요.</b> "이 파일은 model 폴더 소속"이라는 표시입니다.</li>
+  </ol>
+  <div class="note"><b>package와 import.</b> 같은 패키지 안의 파일끼리는 서로 그냥 쓸 수 있습니다. 다른 패키지의 것을 쓰려면 파일 위쪽에 <code>import com.example.mungtimer.model.Mung</code>처럼 "가져오기"를 적어야 합니다. 직접 칠 필요는 없습니다. 빨간 글씨 위에 커서를 두고 <kbd>Alt</kbd>+<kbd>Enter</kbd>(macOS <kbd>Option</kbd>+<kbd>Enter</kbd>)를 누르면 자동으로 넣어 줍니다.</div>
+
+  <h3>D. 오류 없이 작성했는지 확인하기 (빌드)</h3>
+  <ol class="steps">
+    <li>편집기에서 <b>빨간 물결 밑줄</b>이 없는지 봅니다. 오른쪽 위에 초록 체크(✓)가 보이면 그 파일은 문법 오류가 없습니다.</li>
+    <li>툴바의 <b>망치 아이콘 🔨</b>을 누르거나 <kbd>Ctrl</kbd>+<kbd>F9</kbd>(macOS <kbd>Cmd</kbd>+<kbd>F9</kbd>)로 프로젝트 전체를 빌드합니다. 메뉴 이름은 버전에 따라 <b>Make Project</b> 또는 <b>Assemble Project</b>입니다.</li>
+    <li>아래쪽 <b>Build</b> 창에 <code>BUILD SUCCESSFUL</code>이 나오면 성공입니다. 실패하면 빨간 줄을 클릭하세요. 오류가 난 파일의 그 줄로 바로 이동합니다.</li>
+  </ol>
+
+  <h3>오늘의 단축키</h3>
+  <div class="table-wrap"><table>
+    <tr><th>기능</th><th>Windows / Linux</th><th>macOS</th></tr>
+    <tr><td>빠른 수정 (import 추가, 오류 해결 제안)</td><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td><kbd>Option</kbd>+<kbd>Enter</kbd></td></tr>
+    <tr><td>코드 줄 맞춤 (자동 정렬)</td><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>L</kbd></td><td><kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>L</kbd></td></tr>
+    <tr><td>이름 한꺼번에 바꾸기 (Rename)</td><td><kbd>Shift</kbd>+<kbd>F6</kbd></td><td><kbd>Shift</kbd>+<kbd>F6</kbd></td></tr>
+    <tr><td>정의한 곳으로 이동</td><td><kbd>Ctrl</kbd>+<kbd>B</kbd> 또는 <kbd>Ctrl</kbd>+클릭</td><td><kbd>Cmd</kbd>+<kbd>B</kbd> 또는 <kbd>Cmd</kbd>+클릭</td></tr>
+    <tr><td>프로젝트 빌드</td><td><kbd>Ctrl</kbd>+<kbd>F9</kbd></td><td><kbd>Cmd</kbd>+<kbd>F9</kbd></td></tr>
+  </table></div>
+  <div class="note warn"><b>변수나 클래스 이름을 바꿀 때는 꼭 Rename(<kbd>Shift</kbd>+<kbd>F6</kbd>)을 쓰세요.</b> 손으로 고치면 그 이름을 쓰는 다른 파일들이 전부 빨갛게 됩니다. Rename은 쓰인 곳을 모두 찾아 함께 바꿔 줍니다.</div>
+</section>
+
+<section class="sec" data-sec="quiz">
+  <div class="q" data-type="mc" data-answer="4">
+    <p class="q-title"><code>data class</code>가 자동으로 만들어 주는 것이 <b>아닌</b> 것은?</p>
+    <ul class="q-options">
+      <li>내용을 보기 좋게 출력해 주는 <code>toString()</code></li>
+      <li>내용이 같으면 같다고 판단하는 <code>equals()</code></li>
+      <li>일부만 바꾼 복사본을 만드는 <code>copy()</code></li>
+      <li>앱을 꺼도 값이 남도록 파일에 저장하는 기능</li>
+    </ul>
+    <div class="q-explain"><p><code>data class</code>는 메모리 안의 값 묶음일 뿐입니다. 앱을 꺼도 남게 하려면 Day 5에서 배우는 <b>Room</b>(데이터베이스)에 저장해야 합니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="enum">
+    <p class="q-title">정해진 네 가지 등급만 허용하려고 합니다. 빈칸에 들어갈 키워드는?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+____ class MungGrade {
+    COMMON, RARE, EPIC, LEGENDARY
+}
+    </script>
+    <div class="q-explain"><p><code>enum class</code>입니다. 문자열 <code>"희귀"</code> 대신 <code>MungGrade.RARE</code>를 쓰면 오타를 컴파일러가 잡아 줍니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="2">
+    <p class="q-title">출력 결과는?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+data class Mung(val name: String, val stars: Int)
+
+val mungs = listOf(Mung("콩뭉", 1), Mung("달뭉", 2), Mung("불꽃뭉", 3))
+println(mungs.filter { it.stars >= 2 }.map { it.name })
+    </script>
+    <ul class="q-options">
+      <li>[콩뭉, 달뭉, 불꽃뭉]</li>
+      <li>[달뭉, 불꽃뭉]</li>
+      <li>[2, 3]</li>
+      <li>2</li>
+    </ul>
+    <div class="q-explain"><p><code>filter</code>로 별이 2개 이상인 뭉만 남기고(달뭉, 불꽃뭉), <code>map</code>으로 각각을 이름으로 바꿉니다. 점으로 이어 쓰면 왼쪽에서 오른쪽으로 차례로 적용됩니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="sortedByDescending">
+    <p class="q-title">공부 시간이 <b>많은 사람부터</b> 정렬해 랭킹을 만들려고 합니다. 빈칸에 들어갈 함수 이름은?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+val ranking = members.____ { it.todayMinutes }
+    </script>
+    <div class="q-explain"><p><code>sortedByDescending</code>은 기준 값이 큰 것부터(내림차순) 정렬한 <b>새 목록</b>을 돌려줍니다. 작은 것부터는 <code>sortedBy</code>입니다. 원본 목록은 바뀌지 않습니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="3">
+    <p class="q-title">다음 코드는 어떻게 될까요?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+val owned = listOf("콩뭉")
+owned.add("딸기뭉")
+    </script>
+    <ul class="q-options">
+      <li>owned가 [콩뭉, 딸기뭉]이 된다</li>
+      <li>owned가 [딸기뭉]이 된다</li>
+      <li>컴파일 오류: 읽기 전용 List에는 add가 없다</li>
+      <li>실행 중 앱이 멈춘다</li>
+    </ul>
+    <div class="q-explain"><p><code>listOf</code>는 읽기 전용 목록을 만듭니다. 넣고 빼려면 <code>mutableListOf</code>를 써야 합니다. 참고로 <code>val</code>은 "변수에 다른 목록을 다시 대입할 수 없다"는 뜻이지, 목록 내용의 변경 가능 여부와는 별개입니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="1">
+    <p class="q-title">출력 결과는?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+data class TimerState(val seconds: Long, val isRunning: Boolean)
+
+val before = TimerState(10, true)
+val after = before.copy(seconds = 11)
+println("${before.seconds} ${after.seconds} ${after.isRunning}")
+    </script>
+    <ul class="q-options">
+      <li>10 11 true</li>
+      <li>11 11 true</li>
+      <li>10 11 false</li>
+      <li>11 11 false</li>
+    </ul>
+    <div class="q-explain"><p><code>copy</code>는 원본을 건드리지 않고, 지정한 값(<code>seconds</code>)만 바꾼 새 객체를 만듭니다. 지정하지 않은 <code>isRunning</code>은 그대로 복사됩니다. Day 4에서 타이머 상태를 갱신할 때 정확히 이 방식을 씁니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="?:">
+    <p class="q-title">Map에 없는 열쇠를 꺼내면 null입니다. 없을 때 0을 쓰려면 빈칸에 들어갈 연산자는?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+val daily = mapOf("2026-11-10" to 3600L)
+val today = daily["2026-11-11"] ____ 0L
+    </script>
+    <div class="q-explain"><p>어제 배운 엘비스 연산자 <code>?:</code>입니다. <code>map[key]</code>의 결과 타입은 항상 <b>null일 수 있는 타입</b>(<code>Long?</code>)입니다. Day 6에서 "날짜별 공부 시간"을 꺼낼 때 이 코드 그대로 씁니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="3">
+    <p class="q-title"><code>when</code>에 <code>else</code>가 없는데도 컴파일되는 이유는?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+enum class TimerStatus { IDLE, RUNNING, PAUSED }
+
+fun buttonText(status: TimerStatus): String = when (status) {
+    TimerStatus.IDLE -> "시작"
+    TimerStatus.RUNNING -> "일시정지"
+    TimerStatus.PAUSED -> "계속하기"
+}
+    </script>
+    <ul class="q-options">
+      <li><code>when</code>에는 원래 <code>else</code>가 필요 없다</li>
+      <li>String을 돌려주는 함수라서</li>
+      <li>enum의 모든 경우(3가지)를 빠짐없이 다뤘음을 코틀린이 알기 때문</li>
+      <li>실행할 때 오류가 나지만 컴파일은 된다</li>
+    </ul>
+    <div class="q-explain"><p>enum은 가능한 값이 정해져 있으므로, 전부 다루면 <code>else</code>가 필요 없습니다. 나중에 enum에 값을 하나 추가하면 이 <code>when</code>이 <b>컴파일 오류</b>로 "여기도 고쳐야 해요"라고 알려 줍니다. 이 코드는 내일 타이머 화면에서 실제로 씁니다.</p></div>
+  </div>
+</section>
+
+<section class="sec" data-sec="task">
+  <h3>과제: 뭉 데이터 모델 설계하기</h3>
+  <p>앱에 들어갈 뭉의 등급, 뭉 한 마리의 정보, 전체 뭉 목록을 만듭니다. <b>MungTimer 프로젝트의 <code>model</code> 패키지에 파일 3개</b>를 만드세요. 로직 확인은 Kotlin Playground에서 합니다.</p>
+
+  <h4>요구사항 체크리스트</h4>
+  <ul class="checklist">
+    <li><code>MungGrade.kt</code> — <code>enum class MungGrade</code>: <code>COMMON</code>(일반) · <code>RARE</code>(희귀) · <code>EPIC</code>(영웅) · <code>LEGENDARY</code>(전설). 각 등급은 <code>label: String</code>(한글 이름), <code>stars: Int</code>(별 개수), <code>colorHex: Long</code>(등급 색)을 가진다</li>
+    <li><code>Mung.kt</code> — <code>data class Mung</code>: <code>id: Int</code>, <code>name: String</code>, <code>emoji: String</code>, <code>grade: MungGrade</code>, <code>description: String</code></li>
+    <li><code>MungCatalog.kt</code> — <code>object MungCatalog</code>: 전체 뭉 목록 <code>all</code>을 가진다. 최소 12종 (일반 5, 희귀 4, 영웅 2, 전설 1), <code>id</code>는 서로 달라야 한다</li>
+    <li><code>MungCatalog.byGrade(grade)</code> — 해당 등급의 뭉 목록을 돌려준다 (<code>filter</code>)</li>
+    <li><code>MungCatalog.findById(id)</code> — id가 같은 뭉을 돌려주고, 없으면 <code>null</code> (<code>firstOrNull</code>)</li>
+    <li><code>MungCatalog.randomOf(grade)</code> — 해당 등급에서 랜덤으로 한 마리 (<code>random()</code>)</li>
+    <li>안드로이드 스튜디오에서 망치 🔨 로 빌드했을 때 <code>BUILD SUCCESSFUL</code>이 나온다</li>
+  </ul>
+
+  <details class="hint"><summary>힌트 1 — 값을 가진 enum</summary>
+    <p>예제 2처럼 <code>enum class MungGrade(val label: String, val stars: Int, val colorHex: Long)</code>로 선언하고, 각 항목 뒤 괄호에 값을 적습니다. 색은 <code>0xFF8FA79B</code>처럼 16진수로 적습니다(맨 앞 <code>FF</code>는 불투명, 뒤 6자리가 색). 이 숫자는 Int 범위를 넘기 때문에 타입이 <code>Long</code>입니다.</p>
+  </details>
+  <details class="hint"><summary>힌트 2 — 목록 만들기</summary>
+    <p><code>val all: List&lt;Mung&gt; = listOf(Mung(1, "콩뭉", "🌱", MungGrade.COMMON, "설명"), …)</code>처럼 한 줄에 한 마리씩 적습니다. 마지막 항목 뒤에 쉼표를 남겨도 됩니다(나중에 추가하기 편합니다).</p>
+  </details>
+  <details class="hint"><summary>힌트 3 — 세 함수는 모두 한 줄</summary>
+    <p><code>all.filter { it.grade == grade }</code>, <code>all.firstOrNull { it.id == id }</code>, <code>byGrade(grade).random()</code>. 단일 식 함수(<code>=</code>)로 쓰면 깔끔합니다.</p>
+  </details>
+
+  <details class="answer"><summary>모범 답안 보기</summary>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="model/MungGrade.kt" data-path="app/src/main/java/com/example/mungtimer/model/MungGrade.kt">
+package com.example.mungtimer.model
+
+// 뭉의 등급. 선언 순서 = 희귀한 순서 (COMMON이 가장 흔함)
+enum class MungGrade(
+    val label: String,      // 화면에 보여 줄 한글 이름
+    val stars: Int,         // 별 개수
+    val colorHex: Long,     // 등급 색 (0xAARRGGBB). Day 3부터 화면에서 사용
+) {
+    COMMON("일반", 1, 0xFF8FA79B),
+    RARE("희귀", 2, 0xFF4F9FF0),
+    EPIC("영웅", 3, 0xFF9B6DF0),
+    LEGENDARY("전설", 4, 0xFFF0A92B),
+}
+    </script>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="model/Mung.kt" data-path="app/src/main/java/com/example/mungtimer/model/Mung.kt">
+package com.example.mungtimer.model
+
+// 뭉 한 종류의 정보
+data class Mung(
+    val id: Int,                // 고유 번호 (도감 저장에 사용)
+    val name: String,           // 이름
+    val emoji: String,          // 그림 대신 쓰는 이모지
+    val grade: MungGrade,       // 등급
+    val description: String,    // 도감에 보여 줄 한 줄 설명
+)
+    </script>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="model/MungCatalog.kt" data-path="app/src/main/java/com/example/mungtimer/model/MungCatalog.kt">
+package com.example.mungtimer.model
+
+// 앱에 등장하는 모든 뭉. object라서 MungCatalog.all 처럼 바로 쓴다
+object MungCatalog {
+
+    val all: List<Mung> = listOf(
+        Mung(1, "콩뭉", "🌱", MungGrade.COMMON, "이제 막 싹을 틔운 작은 뭉"),
+        Mung(2, "구름뭉", "☁️", MungGrade.COMMON, "폭신폭신 떠다니는 뭉"),
+        Mung(3, "잎뭉", "🍃", MungGrade.COMMON, "바람에 살랑이는 뭉"),
+        Mung(4, "물뭉", "💧", MungGrade.COMMON, "촉촉하고 말랑한 뭉"),
+        Mung(5, "밤뭉", "🌰", MungGrade.COMMON, "가을에 태어난 동글동글 뭉"),
+        Mung(6, "딸기뭉", "🍓", MungGrade.RARE, "달콤한 향이 나는 뭉"),
+        Mung(7, "달뭉", "🌙", MungGrade.RARE, "밤샘 공부를 지켜 주는 뭉"),
+        Mung(8, "꽃뭉", "🌸", MungGrade.RARE, "봄에만 가끔 보이는 뭉"),
+        Mung(9, "눈뭉", "❄️", MungGrade.RARE, "차갑지만 마음은 따뜻한 뭉"),
+        Mung(10, "불꽃뭉", "🔥", MungGrade.EPIC, "열정으로 타오르는 뭉"),
+        Mung(11, "번개뭉", "⚡", MungGrade.EPIC, "집중력이 번쩍이는 뭉"),
+        Mung(12, "무지개뭉", "🌈", MungGrade.LEGENDARY, "오래 공부한 사람에게만 나타나는 전설의 뭉"),
+    )
+
+    // 해당 등급의 뭉만
+    fun byGrade(grade: MungGrade): List<Mung> = all.filter { it.grade == grade }
+
+    // id로 찾기. 없으면 null
+    fun findById(id: Int): Mung? = all.firstOrNull { it.id == id }
+
+    // 해당 등급에서 랜덤으로 한 마리
+    fun randomOf(grade: MungGrade): Mung = byGrade(grade).random()
+}
+    </script>
+    <p><b>Playground에서 확인하기:</b> 위 세 파일의 내용을 <code>package …</code> 줄만 빼고 Playground에 차례로 붙여 넣은 뒤, 아래 <code>main</code>을 맨 아래에 추가해 실행합니다.</p>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="확인용 main" data-run="d2_task" data-run-include="app/src/main/java/com/example/mungtimer/model/MungGrade.kt,app/src/main/java/com/example/mungtimer/model/Mung.kt,app/src/main/java/com/example/mungtimer/model/MungCatalog.kt">
+fun main() {
+    println("전체 뭉: ${MungCatalog.all.size}종")
+
+    for (grade in MungGrade.entries) {
+        val names = MungCatalog.byGrade(grade).map { it.name }
+        val stars = "★".repeat(grade.stars)
+        println("${grade.label} $stars (${names.size}종): $names")
+    }
+
+    println(MungCatalog.findById(12)?.name)
+    println(MungCatalog.findById(99)?.name)
+
+    // id가 겹치지 않는지 검사: 중복을 없앤 개수와 전체 개수가 같아야 한다
+    val uniqueIds = MungCatalog.all.map { it.id }.distinct().size
+    println("id 중복 없음: ${uniqueIds == MungCatalog.all.size}")
+
+    val picked = MungCatalog.randomOf(MungGrade.RARE)
+    println("희귀 뭉 한 마리 뽑기 성공: ${picked.grade == MungGrade.RARE}")
+}
+    </script>
+    <script type="text/plain" class="code" data-lang="output" data-for="d2_task">
+전체 뭉: 12종
+일반 ★ (5종): [콩뭉, 구름뭉, 잎뭉, 물뭉, 밤뭉]
+희귀 ★★ (4종): [딸기뭉, 달뭉, 꽃뭉, 눈뭉]
+영웅 ★★★ (2종): [불꽃뭉, 번개뭉]
+전설 ★★★★ (1종): [무지개뭉]
+무지개뭉
+null
+id 중복 없음: true
+희귀 뭉 한 마리 뽑기 성공: true
+    </script>
+    <p><b>확인 포인트:</b> ① 등급을 문자열이 아닌 <code>enum</code>으로 만들었기 때문에 <code>MungGrade.RARE</code>를 잘못 쓸 수 없습니다. ② <code>findById</code>의 결과 타입이 <code>Mung?</code>라서, 쓰는 쪽은 "없는 경우"를 반드시 처리하게 됩니다. ③ 나만의 뭉으로 이름·이모지·설명을 바꿔도 좋습니다. 단, <code>id</code>는 나중에 저장에 쓰이니 한 번 정하면 바꾸지 마세요.</p>
+  </details>
+</section>
+
+</template>
+<!-- =====================================================================
+     ▲▲▲ 콘텐츠 데이터 끝 ▲▲▲   ▼▼▼ 동작(JS) ▼▼▼
+     ===================================================================== -->
+<script>
+(function () {
+  'use strict';
+
+  /* ------------------------------------------------------------------
+   * 1. Day 데이터 구조
+   *    메뉴에 보이는 정보는 여기(PAGES)에, 본문은 <template id="page-○○">에 있습니다.
+   * ------------------------------------------------------------------ */
+  var PAGES = [
+    { id: 'prep', kicker: 'START', short: '준비', title: '시작하기 전에', emoji: '🧭',
+      desc: '설치 준비물 · 7일 로드맵 · 솔직한 범위 안내' },
+    { id: 'day1', day: 1, title: '코틀린 기초', emoji: '🌱',
+      desc: '변수 · 타입 · 조건문 · 반복문 · 함수 · null 안전성' },
+    { id: 'day2', day: 2, title: '코틀린 핵심', emoji: '🧩',
+      desc: '클래스 · data class · enum · 컬렉션 · 람다 → 뭉 데이터 모델' },
+    { id: 'day3', day: 3, title: 'Compose 기초', emoji: '🎨',
+      desc: '안드로이드 스튜디오 · 컴포저블 · 레이아웃 → 타이머 화면 UI' },
+    { id: 'day4', day: 4, title: '상태와 코루틴', emoji: '⏱️',
+      desc: 'ViewModel · StateFlow · 코루틴 → 타이머 동작 완성' },
+    { id: 'day5', day: 5, title: 'Room과 뭉 뽑기', emoji: '🎁',
+      desc: '확률 로직 · 로컬 저장 → 뭉 뽑기와 뭉 도감' },
+    { id: 'day6', day: 6, title: 'Firebase 그룹', emoji: '👥',
+      desc: '로그인 · 그룹 생성/참여 · 공부 시간 랭킹 · 뭉 자랑' },
+    { id: 'day7', day: 7, title: '완성과 APK', emoji: '🚀',
+      desc: 'Navigation · 마무리 · 버그 수정 · APK 빌드' }
+  ];
+
+  /* 각 Day에 들어가는 6개 섹션 */
+  var SECTIONS = {
+    goal:    { icon: '🎯', label: '오늘의 목표' },
+    concept: { icon: '📖', label: '개념 설명' },
+    example: { icon: '💻', label: '예제 코드' },
+    studio:  { icon: '🛠️', label: '안드로이드 스튜디오 사용법' },
+    quiz:    { icon: '📝', label: '복습 퀴즈' },
+    task:    { icon: '🏗️', label: '오늘의 과제' }
+  };
+  var SECTION_ORDER = ['goal', 'concept', 'example', 'studio', 'quiz', 'task'];
+  var DAY_COUNT = 7;
+
+  /* ------------------------------------------------------------------
+   * 2. 진행률 저장 (localStorage) — 실패해도 사이트는 계속 동작
+   * ------------------------------------------------------------------ */
+  var STORE_KEY = 'mung-study-v1';
+
+  function defaultState() {
+    return { done: {}, quiz: {}, checks: {}, last: 'prep', theme: '' };
+  }
+
+  function loadState() {
+    var base = defaultState();
+    try {
+      var raw = window.localStorage.getItem(STORE_KEY);
+      if (raw) {
+        var saved = JSON.parse(raw);
+        if (saved && typeof saved === 'object') {
+          Object.keys(base).forEach(function (key) {
+            if (saved[key] !== undefined && saved[key] !== null) base[key] = saved[key];
+          });
+        }
+      }
+    } catch (e) {
+      /* 사생활 보호 모드 · 저장소 차단 · 깨진 데이터 → 기본값으로 시작 */
+    }
+    return base;
+  }
+
+  function saveState() {
+    try {
+      window.localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    } catch (e) {
+      /* 저장할 수 없는 환경 → 이번 방문 동안만 메모리에 유지 */
+    }
+  }
+
+  var state = loadState();
+
+  /* ------------------------------------------------------------------
+   * 3. 작은 도우미
+   * ------------------------------------------------------------------ */
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  function el(tag, cls, html) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (html !== undefined) node.innerHTML = html;
+    return node;
+  }
+  function esc(text) {
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function pageById(id) {
+    for (var i = 0; i < PAGES.length; i++) if (PAGES[i].id === id) return PAGES[i];
+    return null;
+  }
+  function templateOf(id) { return document.getElementById('page-' + id); }
+
+  var toastTimer = null;
+  function toast(message) {
+    var box = $('#toast');
+    box.textContent = message;
+    box.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { box.classList.remove('show'); }, 1600);
+  }
+
+  var MUNG_SVG =
+    '<svg class="hero-mung" viewBox="0 0 120 120" aria-hidden="true">' +
+    '<ellipse cx="60" cy="108" rx="34" ry="6" fill="#3D2C3A" opacity=".1"/>' +
+    '<path d="M60 14c-4-9 9-12 8-2 6-5 13 4 4 8 24 3 40 21 40 43 0 26-21 43-52 43S8 89 8 63c0-23 17-41 42-43-8-5 0-13 10-6z" fill="#FF8FA3"/>' +
+    '<path d="M30 44c6-9 16-14 27-15" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".55"/>' +
+    '<circle cx="43" cy="62" r="6" fill="#3D2C3A"/><circle cx="77" cy="62" r="6" fill="#3D2C3A"/>' +
+    '<circle cx="45" cy="60" r="2" fill="#fff"/><circle cx="79" cy="60" r="2" fill="#fff"/>' +
+    '<ellipse cx="31" cy="75" rx="8" ry="5" fill="#FF5E7E" opacity=".45"/><ellipse cx="89" cy="75" rx="8" ry="5" fill="#FF5E7E" opacity=".45"/>' +
+    '<path d="M52 75c4 6 12 6 16 0" stroke="#3D2C3A" stroke-width="4" stroke-linecap="round" fill="none"/></svg>';
+
+  /* ------------------------------------------------------------------
+   * 4. 문법 강조 (외부 라이브러리 없이 직접 구현)
+   * ------------------------------------------------------------------ */
+  function tok(cls, text) {
+    if (!text) return '';
+    /* 여러 줄 토큰은 줄마다 span을 나눠야 줄 단위 래핑이 깨지지 않습니다 */
+    return text.split('\n').map(function (part) {
+      return part ? '<span class="tk-' + cls + '">' + esc(part) + '</span>' : '';
+    }).join('\n');
+  }
+
+  var KOTLIN_KEYWORDS = {};
+  ('package import fun val var if else when for while do return class object interface enum data sealed open ' +
+   'override private public internal protected in is as null true false this super try catch finally throw ' +
+   'suspend companion const lateinit by init constructor typealias break continue abstract annotation inline ' +
+   'vararg out where get set').split(' ').forEach(function (word) { KOTLIN_KEYWORDS[word] = true; });
+
+  function highlightString(text) {
+    var out = '', last = 0, match;
+    var re = /\$\{[^}]*\}|\$[A-Za-z_]\w*/g;
+    while ((match = re.exec(text))) {
+      out += tok('s', text.slice(last, match.index)) + tok('i', match[0]);
+      last = re.lastIndex;
+    }
+    return out + tok('s', text.slice(last));
+  }
+
+  function highlightKotlin(src) {
+    var re = /(\/\/[^\n]*)|(\/\*[\s\S]*?\*\/)|("""[\s\S]*?""")|("(?:\\.|[^"\\\n])*")|('(?:\\.|[^'\\\n])+')|(@[A-Za-z_][\w]*)|(\b0[xX][0-9a-fA-F_]+[uUL]*\b|\b\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?[fFuUL]*\b)|([A-Za-z_][A-Za-z0-9_]*)/g;
+    var out = '', last = 0, match, prevWord = '';
+    while ((match = re.exec(src))) {
+      out += esc(src.slice(last, match.index));
+      var text = match[0];
+      if (match[1] || match[2]) out += tok('c', text);
+      else if (match[3] || match[4]) out += highlightString(text);
+      else if (match[5]) out += tok('s', text);
+      else if (match[6]) out += tok('a', text);
+      else if (match[7]) out += tok('n', text);
+      else {
+        if (KOTLIN_KEYWORDS[text] === true) out += tok('k', text);
+        else if (/^[A-Z]/.test(text)) out += tok('t', text);
+        else if (prevWord === 'fun' || src.charAt(re.lastIndex) === '(') out += tok('f', text);
+        else out += esc(text);
+        prevWord = text;
+      }
+      last = re.lastIndex;
+    }
+    return out + esc(src.slice(last));
+  }
+
+  function highlightXml(src) {
+    var re = /(<!--[\s\S]*?-->)|(<\?xml|\?>|<\/?[\w:.\-]+|\/?>)|("[^"]*")|([\w:.\-]+)(?==)/g;
+    var out = '', last = 0, match;
+    while ((match = re.exec(src))) {
+      out += esc(src.slice(last, match.index));
+      if (match[1]) out += tok('c', match[0]);
+      else if (match[2]) out += tok('g', match[0]);
+      else if (match[3]) out += tok('s', match[0]);
+      else out += tok('b', match[0]);
+      last = re.lastIndex;
+    }
+    return out + esc(src.slice(last));
+  }
+
+  /* TOML · properties · 셸 명령처럼 '#' 주석을 쓰는 설정 파일 */
+  function highlightConf(src) {
+    var re = /(#[^\n]*)|("(?:\\.|[^"\\\n])*")|(^[ \t]*\[[^\]\n]+\])|(^[ \t]*[\w.\-]+)(?=[ \t]*=)/gm;
+    var out = '', last = 0, match;
+    while ((match = re.exec(src))) {
+      out += esc(src.slice(last, match.index));
+      if (match[1]) out += tok('c', match[0]);
+      else if (match[2]) out += tok('s', match[0]);
+      else if (match[3]) out += tok('k', match[0]);
+      else out += tok('b', match[0]);
+      last = re.lastIndex;
+    }
+    return out + esc(src.slice(last));
+  }
+
+  /* Firestore 보안 규칙 · JSON */
+  var RULES_KEYWORDS = {};
+  ('service match allow if function return let true false null read write get list create update delete ' +
+   'rules_version in is').split(' ').forEach(function (word) { RULES_KEYWORDS[word] = true; });
+
+  function highlightRules(src) {
+    var re = /(\/\/[^\n]*)|(\/\*[\s\S]*?\*\/)|("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*')|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][A-Za-z0-9_]*)/g;
+    var out = '', last = 0, match;
+    while ((match = re.exec(src))) {
+      out += esc(src.slice(last, match.index));
+      var text = match[0];
+      if (match[1] || match[2]) out += tok('c', text);
+      else if (match[3]) out += tok('s', text);
+      else if (match[4]) out += tok('n', text);
+      else if (RULES_KEYWORDS[text] === true) out += tok('k', text);
+      else if (src.charAt(re.lastIndex) === '(') out += tok('f', text);
+      else out += esc(text);
+      last = re.lastIndex;
+    }
+    return out + esc(src.slice(last));
+  }
+
+  var LANG_LABEL = { kotlin: 'Kotlin', kts: 'Gradle (Kotlin)', xml: 'XML', toml: 'TOML', conf: '설정', rules: 'Firestore Rules', json: 'JSON', shell: '터미널', text: '', output: '실행 결과' };
+
+  function highlight(src, lang) {
+    if (lang === 'kotlin' || lang === 'kts') return highlightKotlin(src);
+    if (lang === 'xml') return highlightXml(src);
+    if (lang === 'toml' || lang === 'conf' || lang === 'shell') return highlightConf(src);
+    if (lang === 'rules' || lang === 'json') return highlightRules(src);
+    return esc(src);
+  }
+
+  /* "3,5-7" → {3:true,5:true,6:true,7:true} */
+  function parseLineSet(spec) {
+    var set = {};
+    if (!spec) return set;
+    spec.split(',').forEach(function (part) {
+      var range = part.trim().split('-');
+      var from = parseInt(range[0], 10), to = parseInt(range[range.length - 1], 10);
+      if (isNaN(from) || isNaN(to)) return;
+      for (var n = from; n <= to; n++) set[n] = true;
+    });
+    return set;
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+    /* file:// 로 열었거나 오래된 브라우저 → 임시 textarea로 복사 */
+    return new Promise(function (resolve, reject) {
+      var area = document.createElement('textarea');
+      area.value = text;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.top = '-1000px';
+      document.body.appendChild(area);
+      area.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(area);
+      if (ok) resolve(); else reject(new Error('copy failed'));
+    });
+  }
+
+  function buildCodeBlock(source) {
+    var lang = source.getAttribute('data-lang') || 'kotlin';
+    var title = source.getAttribute('data-title') || '';
+    var raw = source.textContent.replace(/^\n/, '').replace(/\s+$/, '');
+    var marked = parseLineSet(source.getAttribute('data-hl'));
+
+    var figure = el('figure', 'code-block' + (lang === 'output' ? ' is-output' : ''));
+    var bar = el('figcaption', 'code-bar');
+    bar.appendChild(el('span', 'code-dots', '<i></i><i></i><i></i>'));
+    var titleNode = el('span', 'code-title');
+    titleNode.textContent = title || (lang === 'output' ? '실행 결과' : '');
+    bar.appendChild(titleNode);
+    var langNode = el('span', 'code-lang');
+    langNode.textContent = title && LANG_LABEL[lang] !== undefined ? LANG_LABEL[lang] : (lang === 'output' ? '' : (LANG_LABEL[lang] || lang));
+    bar.appendChild(langNode);
+    var button = el('button', 'copy-btn');
+    button.type = 'button';
+    button.textContent = '복사';
+    button.setAttribute('aria-label', '코드 복사');
+    button.addEventListener('click', function () {
+      copyText(raw).then(function () {
+        button.textContent = '복사됨!';
+        button.classList.add('is-ok');
+        setTimeout(function () { button.textContent = '복사'; button.classList.remove('is-ok'); }, 1500);
+      }).catch(function () {
+        toast('복사하지 못했어요. 직접 드래그해서 복사해 주세요.');
+      });
+    });
+    bar.appendChild(button);
+    figure.appendChild(bar);
+
+    var lines = highlight(raw, lang).split('\n').map(function (line, index) {
+      return '<span class="ln' + (marked[index + 1] ? ' hl' : '') + '">' + (line || ' ') + '</span>';
+    });
+    var pre = el('pre');
+    pre.setAttribute('tabindex', '0');
+    pre.appendChild(el('code', '', lines.join('')));
+    figure.appendChild(pre);
+    return figure;
+  }
+
+  function renderCodeBlocks(root) {
+    $all('script.code', root).forEach(function (source) {
+      source.parentNode.replaceChild(buildCodeBlock(source), source);
+    });
+  }
+
+  /* ------------------------------------------------------------------
+   * 5. 퀴즈
+   * ------------------------------------------------------------------ */
+  function quizCount(pageId) {
+    var template = templateOf(pageId);
+    return template ? template.content.querySelectorAll('.q').length : 0;
+  }
+  function quizScore(pageId) {
+    var answers = state.quiz[pageId] || {}, score = 0;
+    Object.keys(answers).forEach(function (key) { if (answers[key] && answers[key].ok) score++; });
+    return score;
+  }
+  function normalizeAnswer(text) {
+    return String(text).replace(/\s+/g, ' ').trim();
+  }
+
+  function renderQuiz(root, pageId) {
+    var section = $('.sec[data-sec="quiz"]', root);
+    if (!section) return;
+    var questions = $all('.q', section);
+    if (!questions.length) return;
+
+    var top = el('div', 'quiz-top');
+    var scoreNode = el('div', 'quiz-score');
+    var resetButton = el('button', 'ghost-btn');
+    resetButton.type = 'button';
+    resetButton.textContent = '↺ 퀴즈 다시 풀기';
+    top.appendChild(scoreNode);
+    top.appendChild(resetButton);
+    questions[0].parentNode.insertBefore(top, questions[0]);
+
+    function updateScore() {
+      var answered = Object.keys(state.quiz[pageId] || {}).length;
+      scoreNode.innerHTML = '점수 <span>' + quizScore(pageId) + ' / ' + questions.length + '</span>' +
+        (answered === questions.length ? ' · 모두 풀었어요 🎉' : '');
+      renderNav();
+    }
+
+    resetButton.addEventListener('click', function () {
+      delete state.quiz[pageId];
+      saveState();
+      showPage(pageId, 'quiz');
+    });
+
+    questions.forEach(function (question, index) {
+      var type = question.getAttribute('data-type') || 'mc';
+      var answerSpec = question.getAttribute('data-answer') || '';
+      var titleNode = $('.q-title', question);
+      var explainNode = $('.q-explain', question);
+
+      var head = el('div', 'q-head');
+      head.appendChild(el('span', 'q-no', 'Q' + (index + 1)));
+      head.appendChild(el('span', 'q-type', type === 'fill' ? '빈칸 채우기' : '객관식'));
+      question.insertBefore(head, question.firstChild);
+
+      var result = el('div', 'q-result');
+      result.setAttribute('role', 'status');
+      var verdict = el('b', 'verdict');
+      result.appendChild(verdict);
+      if (explainNode) result.appendChild(explainNode);
+      question.appendChild(result);
+
+      function record(ok, pick) {
+        if (!state.quiz[pageId]) state.quiz[pageId] = {};
+        state.quiz[pageId][index] = { ok: ok, pick: pick };
+        saveState();
+        updateScore();
+      }
+
+      if (type === 'fill') {
+        var accepted = answerSpec.split('||').map(normalizeAnswer);
+        var form = el('form', 'q-fill');
+        var input = el('input');
+        input.type = 'text';
+        input.setAttribute('autocomplete', 'off');
+        input.setAttribute('autocapitalize', 'off');
+        input.setAttribute('spellcheck', 'false');
+        input.placeholder = '빈칸에 들어갈 코드를 입력';
+        input.setAttribute('aria-label', titleNode ? titleNode.textContent : '빈칸 답 입력');
+        var submit = el('button', 'btn');
+        submit.type = 'submit';
+        submit.textContent = '확인';
+        form.appendChild(input);
+        form.appendChild(submit);
+        question.insertBefore(form, result);
+
+        var showFill = function (ok, value) {
+          input.value = value;
+          input.disabled = true;
+          submit.disabled = true;
+          input.classList.add(ok ? 'is-correct' : 'is-wrong');
+          verdict.textContent = ok ? '정답이에요! 🎉' : '아쉬워요 😢  정답: ' + accepted[0];
+          result.className = 'q-result show ' + (ok ? 'ok' : 'bad');
+        };
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          var value = normalizeAnswer(input.value);
+          if (!value) { input.focus(); return; }
+          var ok = accepted.indexOf(value) !== -1;
+          showFill(ok, value);
+          record(ok, value);
+        });
+        var savedFill = state.quiz[pageId] && state.quiz[pageId][index];
+        if (savedFill) showFill(savedFill.ok, savedFill.pick);
+      } else {
+        var correctIndex = parseInt(answerSpec, 10) - 1;
+        var list = $('.q-options', question);
+        var buttons = $all('li', list).map(function (item, optionIndex) {
+          var button = el('button', 'q-opt');
+          button.type = 'button';
+          var mark = el('span', 'mark');
+          mark.textContent = String(optionIndex + 1);
+          var label = el('span');
+          while (item.firstChild) label.appendChild(item.firstChild);
+          button.appendChild(mark);
+          button.appendChild(label);
+          item.appendChild(button);
+          return button;
+        });
+        var showChoice = function (pick) {
+          buttons.forEach(function (button, optionIndex) {
+            button.disabled = true;
+            if (optionIndex === correctIndex) {
+              button.classList.add('is-correct');
+              $('.mark', button).textContent = '✓';
+            } else if (optionIndex === pick) {
+              button.classList.add('is-wrong');
+              $('.mark', button).textContent = '✕';
+            }
+          });
+          var ok = pick === correctIndex;
+          verdict.textContent = ok ? '정답이에요! 🎉' : '아쉬워요 😢  정답은 ' + (correctIndex + 1) + '번';
+          result.className = 'q-result show ' + (ok ? 'ok' : 'bad');
+        };
+        buttons.forEach(function (button, optionIndex) {
+          button.addEventListener('click', function () {
+            showChoice(optionIndex);
+            record(optionIndex === correctIndex, optionIndex);
+          });
+        });
+        var savedChoice = state.quiz[pageId] && state.quiz[pageId][index];
+        if (savedChoice) showChoice(savedChoice.pick);
+      }
+    });
+
+    updateScore();
+  }
+
+  /* ------------------------------------------------------------------
+   * 6. 과제 체크리스트 · 접어두기
+   * ------------------------------------------------------------------ */
+  function renderChecklists(root, pageId) {
+    $all('ul.checklist', root).forEach(function (list, listIndex) {
+      $all('li', list).forEach(function (item, itemIndex) {
+        var key = pageId + ':' + listIndex + ':' + itemIndex;
+        var label = el('label', 'check-item');
+        var box = el('input');
+        box.type = 'checkbox';
+        box.checked = !!state.checks[key];
+        var text = el('span');
+        while (item.firstChild) text.appendChild(item.firstChild);
+        label.appendChild(box);
+        label.appendChild(text);
+        item.appendChild(label);
+        box.addEventListener('change', function () {
+          if (box.checked) state.checks[key] = true; else delete state.checks[key];
+          saveState();
+        });
+      });
+    });
+  }
+
+  function wrapDetails(root) {
+    $all('details', root).forEach(function (details) {
+      var body = el('div', 'details-body');
+      var nodes = Array.prototype.slice.call(details.childNodes);
+      nodes.forEach(function (node) {
+        if (node.nodeType === 1 && node.tagName === 'SUMMARY') return;
+        body.appendChild(node);
+      });
+      details.appendChild(body);
+    });
+  }
+
+  /* ------------------------------------------------------------------
+   * 7. 뭉 뽑기 시뮬레이터 (Day 5 개념 설명용)
+   *    앱의 확률표와 똑같은 숫자를 사용합니다.
+   * ------------------------------------------------------------------ */
+  var GACHA_TABLE = [
+    { from: 180, label: '180분 이상', rates: [25, 40, 25, 10] },
+    { from: 120, label: '120~179분', rates: [40, 37, 17, 6] },
+    { from: 60, label: '60~119분', rates: [55, 32, 10, 3] },
+    { from: 30, label: '30~59분', rates: [70, 25, 4, 1] }
+  ];
+  var GRADE_NAMES = ['일반', '희귀', '영웅', '전설'];
+  var GRADE_CLASS = ['', 'rare', 'epic', 'legend'];
+
+  function gachaRow(minutes) {
+    for (var i = 0; i < GACHA_TABLE.length; i++) if (minutes >= GACHA_TABLE[i].from) return GACHA_TABLE[i];
+    return null;
+  }
+  function gachaDraw(rates) {
+    var roll = Math.floor(Math.random() * 100), sum = 0;
+    for (var i = 0; i < rates.length; i++) { sum += rates[i]; if (roll < sum) return i; }
+    return 0;
+  }
+
+  function renderGachaSim(root) {
+    $all('[data-widget="gacha"]', root).forEach(function (box) {
+      box.innerHTML =
+        '<div class="sim-row"><label for="simMin"><b>공부 시간</b></label>' +
+        '<input id="simMin" type="range" min="0" max="240" step="5" value="45">' +
+        '<b id="simMinText"></b></div>' +
+        '<div class="sim-row"><button class="btn" type="button" id="simOne">뭉 1번 뽑기</button>' +
+        '<button class="btn alt" type="button" id="simMany">1,000번 뽑아 비율 보기</button></div>' +
+        '<div class="sim-result" id="simResult" aria-live="polite"></div>' +
+        '<div class="sim-out" id="simOut"></div>';
+      var range = $('#simMin', box), text = $('#simMinText', box), out = $('#simOut', box), result = $('#simResult', box);
+
+      function showRates(counts, total) {
+        var row = gachaRow(parseInt(range.value, 10));
+        out.innerHTML = '';
+        if (!row) return;
+        row.rates.forEach(function (rate, index) {
+          var actual = counts ? ' → 실제 ' + (counts[index] / total * 100).toFixed(1) + '%' : '';
+          out.appendChild(el('div', 'sim-cell',
+            '<span class="grade ' + GRADE_CLASS[index] + '">' + GRADE_NAMES[index] + '</span><b>' + rate + '%</b><small>' + actual + '</small>'));
+        });
+      }
+      function refresh() {
+        var minutes = parseInt(range.value, 10), row = gachaRow(minutes);
+        text.textContent = minutes + '분' + (row ? ' (' + row.label + ' 구간)' : ' (30분 미만)');
+        result.textContent = row ? '' : '30분 미만이라 뭉이 나오지 않아요. 조금만 더 힘내요! 💪';
+        $('#simOne', box).disabled = !row;
+        $('#simMany', box).disabled = !row;
+        showRates(null, 0);
+      }
+      range.addEventListener('input', refresh);
+      $('#simOne', box).addEventListener('click', function () {
+        var row = gachaRow(parseInt(range.value, 10));
+        if (!row) return;
+        var grade = gachaDraw(row.rates);
+        result.innerHTML = '🎉 <span class="grade ' + GRADE_CLASS[grade] + '">' + GRADE_NAMES[grade] + '</span> 등급 뭉이 나왔어요!';
+      });
+      $('#simMany', box).addEventListener('click', function () {
+        var row = gachaRow(parseInt(range.value, 10));
+        if (!row) return;
+        var counts = [0, 0, 0, 0], total = 1000;
+        for (var i = 0; i < total; i++) counts[gachaDraw(row.rates)]++;
+        result.textContent = '1,000번 뽑은 결과예요. 설계한 확률과 비슷하게 나오는지 보세요.';
+        showRates(counts, total);
+      });
+      refresh();
+    });
+  }
+
+  /* ------------------------------------------------------------------
+   * 8. 메뉴 · 전체 진행률
+   * ------------------------------------------------------------------ */
+  var currentId = null;
+
+  function doneCount() {
+    var count = 0;
+    for (var day = 1; day <= DAY_COUNT; day++) if (state.done['day' + day]) count++;
+    return count;
+  }
+
+  function renderNav() {
+    var nav = $('#nav');
+    nav.innerHTML = '';
+    var totalScore = 0, totalQuestions = 0;
+    PAGES.forEach(function (page) {
+      var count = quizCount(page.id), score = quizScore(page.id);
+      totalScore += score;
+      totalQuestions += count;
+      var link = el('a', 'nav-item' + (state.done[page.id] ? ' is-done' : ''));
+      link.href = '#' + page.id;
+      if (page.id === currentId) link.setAttribute('aria-current', 'page');
+      var kicker = page.day ? 'DAY ' + page.day : page.kicker;
+      var shortTitle = page.day ? 'Day ' + page.day : page.short;
+      link.innerHTML =
+        '<span class="nav-emoji" aria-hidden="true">' + page.emoji + '</span>' +
+        '<span><span class="nav-kicker">' + kicker + '</span>' +
+        '<span class="nav-title"><span class="long"><br>' + esc(page.title) + '</span><span class="short">' + shortTitle + '</span></span></span>' +
+        (page.day
+          ? '<span class="nav-meta"><span class="nav-check" aria-hidden="true">✓</span><span>퀴즈 ' + score + '/' + count + '</span></span>'
+          : '<span class="nav-meta"></span>');
+      if (page.day) link.setAttribute('aria-label', 'Day ' + page.day + ' ' + page.title + (state.done[page.id] ? ' (완료)' : ''));
+      nav.appendChild(link);
+    });
+    var done = doneCount();
+    $('#totalDays').textContent = done + ' / ' + DAY_COUNT;
+    $('#totalQuiz').textContent = totalScore + ' / ' + totalQuestions;
+    $('#totalBar').style.width = (done / DAY_COUNT * 100) + '%';
+    $('#totalBarWrap').setAttribute('aria-valuenow', String(done));
+    $('#mobileProgress').textContent = done + '/' + DAY_COUNT + '일 · 퀴즈 ' + totalScore + '/' + totalQuestions;
+    var active = $('.nav-item[aria-current="page"]', nav);
+    if (active && nav.scrollWidth > nav.clientWidth) {
+      nav.scrollLeft = active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
+    }
+  }
+
+  /* ------------------------------------------------------------------
+   * 9. 페이지 그리기
+   * ------------------------------------------------------------------ */
+  function buildHero(page) {
+    var hero = el('header', 'hero');
+    var left = el('div');
+    left.appendChild(el('div', 'hero-kicker', page.day ? 'DAY ' + page.day + ' / ' + DAY_COUNT : '뭉타이머 7일 완성'));
+    var title = el('h1');
+    title.textContent = page.emoji + ' ' + page.title;
+    left.appendChild(title);
+    var desc = el('p');
+    desc.textContent = page.desc;
+    left.appendChild(desc);
+    if (page.day) {
+      var chips = el('div', 'hero-chips');
+      chips.appendChild(el('span', 'chip' + (state.done[page.id] ? ' is-on' : ''), state.done[page.id] ? '✓ 완료한 일차' : '아직 진행 중'));
+      chips.appendChild(el('span', 'chip', '퀴즈 ' + quizCount(page.id) + '문제'));
+      left.appendChild(chips);
+    }
+    hero.appendChild(left);
+    hero.insertAdjacentHTML('beforeend', MUNG_SVG);
+    return hero;
+  }
+
+  function decorateSections(root, page) {
+    var navBar = el('nav', 'sec-nav');
+    navBar.setAttribute('aria-label', '이 페이지의 섹션');
+    var step = 0;
+    $all('.sec', root).forEach(function (section) {
+      var key = section.getAttribute('data-sec');
+      var info = SECTIONS[key] || { icon: section.getAttribute('data-icon') || '📌', label: section.getAttribute('data-title') || '' };
+      step++;
+      section.id = page.id + '-' + (key || 'sec' + step);
+      var head = el('div', 'sec-head');
+      head.appendChild(el('div', 'sec-num', info.icon));
+      var titleBox = el('div');
+      if (page.day) titleBox.appendChild(el('div', 'sec-step', 'STEP ' + step + ' / ' + SECTION_ORDER.length));
+      var heading = el('h2');
+      heading.textContent = info.label;
+      titleBox.appendChild(heading);
+      head.appendChild(titleBox);
+      section.insertBefore(head, section.firstChild);
+
+      var link = el('a');
+      link.href = '#' + page.id + '/' + (key || 'sec' + step);
+      link.textContent = info.icon + ' ' + info.label;
+      link.addEventListener('click', function (event) {
+        event.preventDefault();
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      navBar.appendChild(link);
+    });
+    return navBar;
+  }
+
+  function buildDoneBox(page) {
+    var box = el('div', 'done-box');
+    var text = el('p');
+    var button = el('button', 'btn');
+    button.type = 'button';
+    function refresh() {
+      var done = !!state.done[page.id];
+      text.innerHTML = done
+        ? '<b>Day ' + page.day + ' 완료!</b> 뭉이 박수를 치고 있어요 👏'
+        : '퀴즈와 과제를 끝냈다면 완료로 표시해 주세요.';
+      button.textContent = done ? '완료 취소' : '✓ Day ' + page.day + ' 완료로 표시';
+      button.className = done ? 'btn alt' : 'btn';
+    }
+    button.addEventListener('click', function () {
+      if (state.done[page.id]) delete state.done[page.id]; else state.done[page.id] = true;
+      saveState();
+      refresh();
+      renderNav();
+      var chip = $('.hero-chips .chip');
+      if (chip) {
+        chip.className = 'chip' + (state.done[page.id] ? ' is-on' : '');
+        chip.textContent = state.done[page.id] ? '✓ 완료한 일차' : '아직 진행 중';
+      }
+      if (state.done[page.id]) toast('Day ' + page.day + ' 완료! 수고했어요 🎉');
+    });
+    refresh();
+    box.appendChild(text);
+    box.appendChild(button);
+    return box;
+  }
+
+  function buildPager(page) {
+    var index = PAGES.indexOf(page);
+    var pager = el('nav', 'pager');
+    pager.setAttribute('aria-label', '이전/다음 페이지');
+    var prev = PAGES[index - 1], next = PAGES[index + 1];
+    function label(target) { return (target.day ? 'Day ' + target.day + ' · ' : '') + target.title; }
+    var prevLink = el('a', 'prev');
+    if (prev) { prevLink.href = '#' + prev.id; prevLink.innerHTML = '<small>← 이전</small>' + esc(label(prev)); } else prevLink.hidden = true;
+    var nextLink = el('a', 'next');
+    if (next) { nextLink.href = '#' + next.id; nextLink.innerHTML = '<small>다음 →</small>' + esc(label(next)); } else nextLink.hidden = true;
+    pager.appendChild(prevLink);
+    pager.appendChild(nextLink);
+    return pager;
+  }
+
+  function showPage(id, sectionKey) {
+    var page = pageById(id) || PAGES[0];
+    var template = templateOf(page.id);
+    var container = $('#page');
+    currentId = page.id;
+    container.innerHTML = '';
+
+    var content = document.createDocumentFragment();
+    if (template) content.appendChild(template.content.cloneNode(true));
+    var holder = el('div');
+    holder.appendChild(content);
+
+    wrapDetails(holder);
+    var sectionNav = decorateSections(holder, page);
+    renderCodeBlocks(holder);
+    renderChecklists(holder, page.id);
+
+    container.appendChild(buildHero(page));
+    container.appendChild(sectionNav);
+    while (holder.firstChild) container.appendChild(holder.firstChild);
+    renderQuiz(container, page.id);
+    renderGachaSim(container);
+    if (page.day) container.appendChild(buildDoneBox(page));
+    container.appendChild(buildPager(page));
+
+    state.last = page.id;
+    saveState();
+    renderNav();
+    document.title = (page.day ? 'Day ' + page.day + ' ' : '') + page.title + ' · 뭉타이머 7일 완성';
+
+    var target = sectionKey ? document.getElementById(page.id + '-' + sectionKey) : null;
+    if (target) target.scrollIntoView({ block: 'start' });
+    else window.scrollTo(0, 0);
+  }
+
+  /* 주소의 #day3 또는 #day3/quiz 형태를 읽어 페이지를 고릅니다 */
+  function route() {
+    var hash = decodeURIComponent(window.location.hash.replace(/^#/, ''));
+    var parts = hash.split('/');
+    var id = pageById(parts[0]) ? parts[0] : (pageById(state.last) ? state.last : 'prep');
+    if (id === currentId && !parts[1]) { window.scrollTo(0, 0); return; }
+    showPage(id, parts[1]);
+  }
+
+  /* ------------------------------------------------------------------
+   * 10. 테마 전환 · 초기화 버튼
+   * ------------------------------------------------------------------ */
+  function applyTheme() {
+    if (state.theme === 'light' || state.theme === 'dark') {
+      document.documentElement.setAttribute('data-theme', state.theme);
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }
+
+  document.addEventListener('click', function (event) {
+    var trigger = event.target.closest ? event.target.closest('[data-action]') : null;
+    if (!trigger) return;
+    var action = trigger.getAttribute('data-action');
+    if (action === 'theme') {
+      var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var now = state.theme || (systemDark ? 'dark' : 'light');
+      state.theme = now === 'dark' ? 'light' : 'dark';
+      saveState();
+      applyTheme();
+    } else if (action === 'reset') {
+      if (window.confirm('완료 표시, 퀴즈 점수, 과제 체크를 모두 지울까요?')) {
+        var theme = state.theme;
+        state = defaultState();
+        state.theme = theme;
+        state.last = currentId || 'prep';
+        saveState();
+        showPage(state.last);
+        toast('진행률을 초기화했어요.');
+      }
+    }
+  });
+
+  applyTheme();
+  window.addEventListener('hashchange', route);
+  route();
+})();
+</script>
+</body>
+</html>
