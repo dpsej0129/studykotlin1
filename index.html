@@ -3339,6 +3339,1181 @@ fun FinishDialog(studySeconds: Long, onDismiss: () -> Unit) {
 </section>
 
 </template>
+
+<!-- ===================== Day 5 : Room 로컬 저장 + 확률 로직 ===================== -->
+<template id="page-day5">
+
+<section class="sec" data-sec="goal">
+  <p>오늘은 뭉타이머의 재미를 담당하는 날입니다. <b>공부 시간에 따라 달라지는 확률</b>로 뭉을 뽑고, 얻은 뭉을 기기 안의 데이터베이스(<b>Room</b>)에 저장해 <b>뭉 도감</b>에서 언제든 볼 수 있게 만듭니다.</p>
+  <h3>오늘이 끝나면 할 수 있는 것</h3>
+  <ul>
+    <li>"70% / 25% / 4% / 1%" 같은 확률을 코드로 구현하고, 시뮬레이션으로 검증할 수 있다.</li>
+    <li>Room의 세 요소 <code>@Entity</code> · <code>@Dao</code> · <code>@Database</code>로 데이터를 저장하고 읽을 수 있다.</li>
+    <li>DB가 주는 <code>Flow</code>를 화면 상태로 바꿔, 저장하는 즉시 화면이 갱신되게 할 수 있다.</li>
+    <li><code>LazyVerticalGrid</code>로 격자 모양 목록을 만들 수 있다.</li>
+    <li>Database Inspector로 저장된 데이터를 직접 들여다볼 수 있다.</li>
+  </ul>
+  <div class="link-app">
+    <div class="ico">🔗</div>
+    <div><b>최종 앱과의 연결</b>
+    명세 2번 <b>뭉 뽑기</b>(30분 이상이면 1마리, 미만이면 안내 메시지)와 3번 <b>뭉 등급 · 뭉 도감</b>을 오늘 완성합니다. 함께 저장하는 "공부 기록"은 내일 그룹 랭킹에 올릴 데이터가 됩니다.</div>
+  </div>
+</section>
+
+<section class="sec" data-sec="concept">
+  <h3>1. 시간대별 확률표</h3>
+  <p>공부 시간이 길수록 높은 등급이 잘 나오도록, 네 구간의 확률을 아래와 같이 설계했습니다. <b>각 줄의 합은 반드시 100</b>입니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>공부 시간</th><th class="num"><span class="grade">일반</span></th><th class="num"><span class="grade rare">희귀</span></th><th class="num"><span class="grade epic">영웅</span></th><th class="num"><span class="grade legend">전설</span></th><th>설계 의도</th></tr>
+    <tr><td>30분 미만</td><td class="num">–</td><td class="num">–</td><td class="num">–</td><td class="num">–</td><td>뭉이 나오지 않고 안내 메시지만 표시</td></tr>
+    <tr><td>30 ~ 59분</td><td class="num">70%</td><td class="num">25%</td><td class="num">4%</td><td class="num">1%</td><td>짧게라도 하면 뭉은 나온다</td></tr>
+    <tr><td>60 ~ 119분</td><td class="num">55%</td><td class="num">32%</td><td class="num">10%</td><td class="num">3%</td><td>1시간을 넘기면 희귀 이상이 45%</td></tr>
+    <tr><td>120 ~ 179분</td><td class="num">40%</td><td class="num">37%</td><td class="num">17%</td><td class="num">6%</td><td>영웅이 6번에 1번꼴</td></tr>
+    <tr><td>180분 이상</td><td class="num">25%</td><td class="num">40%</td><td class="num">25%</td><td class="num">10%</td><td>전설이 10번에 1번. 일반이 오히려 드물다</td></tr>
+  </table></div>
+  <p>직접 뽑아 보세요. 아래 시뮬레이터는 앱과 <b>같은 확률표, 같은 방식</b>으로 동작합니다.</p>
+  <div class="sim" data-widget="gacha"></div>
+
+  <h3>2. 확률을 코드로: 0~99 주사위와 누적 구간</h3>
+  <div class="note analogy"><b>비유 — 100칸짜리 룰렛.</b> 0번부터 99번까지 100칸이 있는 룰렛을 등급별로 색칠합니다. 30분 구간이라면 0~69번(70칸)은 일반, 70~94번(25칸)은 희귀, 95~98번(4칸)은 영웅, 99번(1칸)은 전설입니다. 구슬이 멈춘 칸의 색이 결과입니다.</div>
+  <p>코드로는 <code>Random.nextInt(100)</code>으로 0~99 중 하나(<code>roll</code>)를 뽑고, 확률을 앞에서부터 <b>더해 가며</b>(누적) <code>roll</code>이 그 값보다 작아지는 첫 등급을 고릅니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>등급</th><th class="num">확률</th><th class="num">누적</th><th>당첨되는 roll</th></tr>
+    <tr><td><span class="grade">일반</span></td><td class="num">70</td><td class="num">70</td><td>roll &lt; 70 → 0 ~ 69</td></tr>
+    <tr><td><span class="grade rare">희귀</span></td><td class="num">25</td><td class="num">95</td><td>roll &lt; 95 → 70 ~ 94</td></tr>
+    <tr><td><span class="grade epic">영웅</span></td><td class="num">4</td><td class="num">99</td><td>roll &lt; 99 → 95 ~ 98</td></tr>
+    <tr><td><span class="grade legend">전설</span></td><td class="num">1</td><td class="num">100</td><td>roll &lt; 100 → 99</td></tr>
+  </table></div>
+  <p>뽑기는 두 단계입니다. <b>① 등급을 확률로 정하고 → ② 그 등급의 뭉 중 한 마리를 고르게 뽑는다.</b></p>
+
+  <h3>3. 왜 데이터베이스가 필요할까</h3>
+  <div class="table-wrap"><table>
+    <tr><th>저장 장소</th><th>언제 사라지나</th><th>알맞은 용도</th></tr>
+    <tr><td><code>remember</code></td><td>화면 회전</td><td>잠깐 쓰는 화면 값</td></tr>
+    <tr><td>ViewModel</td><td>앱 종료</td><td>화면 상태</td></tr>
+    <tr><td><code>SharedPreferences</code></td><td>앱 삭제</td><td>값 몇 개 (타이머 시작 시각)</td></tr>
+    <tr><td><b>Room (데이터베이스)</b></td><td>앱 삭제</td><td><b>개수가 늘어나는 목록</b> (얻은 뭉, 공부 기록). 정렬·합계·검색 가능</td></tr>
+  </table></div>
+
+  <h3>4. Room의 세 요소</h3>
+  <div class="note analogy"><b>비유 — 도서관.</b> <code>@Entity</code>는 <b>책장에 꽂힌 카드 한 장의 양식</b>(어떤 칸이 있는지), <code>@Dao</code>는 <b>사서</b>(부탁할 수 있는 일의 목록: 넣어 주세요, 찾아 주세요), <code>@Database</code>는 <b>도서관 건물</b>(어떤 카드 양식들을 쓰고, 어떤 사서가 있는지)입니다.</div>
+  <div class="table-wrap"><table>
+    <tr><th>요소</th><th>코틀린으로는</th><th>뭉타이머에서</th></tr>
+    <tr><td><code>@Entity</code></td><td><code>data class</code> 하나 = 표(table) 하나. 객체 하나 = 표의 한 줄</td><td><code>OwnedMung</code>, <code>StudySession</code></td></tr>
+    <tr><td><code>@Dao</code></td><td><code>interface</code>. 함수 이름과 SQL만 적으면 구현은 Room이 만들어 준다</td><td><code>MungDao</code>, <code>StudyDao</code></td></tr>
+    <tr><td><code>@Database</code></td><td><code>abstract class</code>. Entity 목록과 DAO를 연결한다</td><td><code>AppDatabase</code></td></tr>
+  </table></div>
+  <p>"구현을 Room이 만들어 준다"는 것은, 빌드할 때 <b>KSP</b>라는 도구가 어노테이션(<code>@</code>)을 읽고 실제 저장 코드를 자동으로 써 준다는 뜻입니다. 그래서 오늘은 Gradle에 KSP 플러그인을 추가합니다.</p>
+
+  <h3>5. 딱 필요한 만큼의 SQL</h3>
+  <script type="text/plain" class="code" data-lang="text" data-title="오늘 쓰는 SQL 읽는 법">
+SELECT * FROM owned_mung ORDER BY obtainedAt DESC
+  └ owned_mung 표의 모든 칸(*)을 가져오되, obtainedAt이 큰(최근) 것부터(DESC)
+
+SELECT COUNT(*) FROM owned_mung
+  └ owned_mung 표에 몇 줄이 있는지
+
+SELECT dateKey, SUM(seconds) AS seconds FROM study_session
+WHERE dateKey >= :fromDateKey GROUP BY dateKey
+  └ study_session 표에서 날짜가 :fromDateKey 이후인 줄만 골라(WHERE),
+    날짜별로 묶어서(GROUP BY) 각 날짜의 seconds 합계(SUM)를 구한다
+    (:fromDateKey 는 함수의 매개변수 값이 들어가는 자리)
+  </script>
+  <p>넣기는 SQL 없이 <code>@Insert</code>만 붙이면 됩니다.</p>
+
+  <h3>6. 쓰기는 <code>suspend</code>, 읽기는 <code>Flow</code></h3>
+  <ul>
+    <li><b>쓰기</b>(<code>insert</code>)는 디스크에 기록하느라 시간이 걸리므로 <code>suspend</code> 함수입니다. 어제 배운 대로 코루틴(<code>viewModelScope.launch</code>) 안에서 부릅니다.</li>
+    <li><b>읽기</b>를 <code>Flow&lt;List&lt;OwnedMung&gt;&gt;</code>로 받으면, 표가 바뀔 때마다 <b>새 목록이 자동으로 흘러나옵니다</b>. 뭉을 저장하는 코드와 도감 화면이 서로를 몰라도, 저장하는 순간 도감이 갱신됩니다.</li>
+  </ul>
+  <div class="note analogy"><b>비유 — 수도관.</b> <code>Flow</code>는 값이 계속 흘러나오는 수도관입니다. 어제의 <code>StateFlow</code>(전광판)는 "항상 최신 값 하나를 들고 있는" 특별한 Flow입니다. Room이 주는 수도관을 <code>stateIn(…)</code>으로 전광판에 연결하면 화면이 구독할 수 있습니다.</div>
+
+  <div class="note warn"><b>Room 2와 Room 3.</b> 이 사이트는 최신 안정 버전인 <b>Room 3</b>(<code>androidx.room3</code>)을 씁니다. 인터넷의 많은 글은 Room 2(<code>androidx.room</code>) 기준인데, 개념(Entity/Dao/Database)은 같고 달라진 점은 세 가지입니다: ① import가 <code>androidx.room3.…</code> ② DB를 만들 때 <code>.setDriver(AndroidSQLiteDriver())</code> 한 줄이 필요 ③ DAO 함수는 반드시 <code>suspend</code>이거나 <code>Flow</code>를 돌려줘야 함.</div>
+</section>
+
+<section class="sec" data-sec="example">
+  <p>예제 1~2는 <a href="https://play.kotlinlang.org" target="_blank" rel="noopener">Kotlin Playground</a>에서 실행합니다. 예제 3~5는 <b>앱에 실제로 들어가는 파일</b>이므로 안드로이드 스튜디오에 <code>data</code> 패키지를 만들어 작성합니다. 먼저 다음 섹션 A의 Gradle 설정을 해야 빨간 줄이 사라집니다.</p>
+
+  <h3>예제 1. 누적 확률로 등급 뽑기 + 시뮬레이션으로 검증</h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex1.kt" data-run="d5_ex1">
+import kotlin.random.Random
+
+enum class Grade { COMMON, RARE, EPIC, LEGENDARY }
+
+// 30~59분 구간의 확률표: 등급 → 확률(%)
+val rates = mapOf(
+    Grade.COMMON to 70,
+    Grade.RARE to 25,
+    Grade.EPIC to 4,
+    Grade.LEGENDARY to 1,
+)
+
+fun drawGrade(): Grade {
+    val roll = Random.nextInt(100)          // 0 이상 100 미만의 정수 (룰렛의 칸 번호)
+    var cumulative = 0                      // 누적 확률
+    for (grade in Grade.entries) {          // COMMON → RARE → EPIC → LEGENDARY 순서로
+        cumulative += rates[grade] ?: 0     // 70 → 95 → 99 → 100
+        if (roll < cumulative) return grade // 처음으로 roll보다 커지는 구간이 당첨
+    }
+    return Grade.COMMON                     // 합계가 100이면 여기까지 오지 않는다 (안전장치)
+}
+
+fun main() {
+    println("확률 합계: ${rates.values.sum()}")     // 100이 아니면 표를 잘못 만든 것
+
+    // 한 번 뽑기
+    println("이번에 나온 등급: ${drawGrade()}")
+
+    // 10만 번 뽑아서 실제 비율이 설계한 확률과 비슷한지 확인 (확률 코드를 검증하는 방법)
+    val total = 100_000
+    val counts = mutableMapOf<Grade, Int>()
+    repeat(total) {                                 // repeat(n) { } : n번 반복
+        val grade = drawGrade()
+        counts[grade] = (counts[grade] ?: 0) + 1
+    }
+    for (grade in Grade.entries) {
+        val percent = (counts[grade] ?: 0) * 100.0 / total
+        println("$grade: 설계 ${rates[grade]}% → 실제 $percent%")
+    }
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d5_ex1">
+확률 합계: 100
+이번에 나온 등급: COMMON              ← (랜덤) 아래 숫자는 실행할 때마다 조금씩 달라져요
+COMMON: 설계 70% → 실제 70.108%
+RARE: 설계 25% → 실제 24.913%
+EPIC: 설계 4% → 실제 3.977%
+LEGENDARY: 설계 1% → 실제 1.002%
+  </script>
+
+  <h3>예제 2. <code>Flow</code> — 데이터가 바뀌면 화면이 알아서 따라온다</h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex2.kt" data-run="d5_ex2">
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+
+fun main() = runBlocking {
+    // DB의 표 역할을 하는 가짜 저장소: 내가 얻은 뭉의 id 목록
+    val table = MutableStateFlow(listOf<Int>())
+
+    // map: 흘러나오는 값 하나하나를 다른 모양으로 바꾼 새 Flow (목록의 map과 같은 생각)
+    val summary: Flow<String> = table.map { ids ->
+        "뭉 ${ids.size}마리 (${ids.distinct().size}종)"
+    }
+
+    // 도감 화면 역할: summary를 구독하고 있다
+    val screen = launch {
+        summary.collect { text -> println("도감 화면: $text") }
+    }
+
+    // 타이머 쪽에서 뭉을 저장한다. 도감 화면을 전혀 모르지만, 화면은 알아서 갱신된다
+    delay(100)
+    table.update { it + 1 }         // 1번 뭉 획득 (목록 + 값 = 값이 추가된 새 목록)
+    delay(100)
+    table.update { it + 6 }         // 6번 뭉 획득
+    delay(100)
+    table.update { it + 1 }         // 1번 뭉을 또 획득
+    delay(100)
+
+    screen.cancel()
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d5_ex2">
+도감 화면: 뭉 0마리 (0종)
+도감 화면: 뭉 1마리 (1종)
+도감 화면: 뭉 2마리 (2종)
+도감 화면: 뭉 3마리 (2종)
+  </script>
+
+  <h3>예제 3. Entity — 표의 모양 정하기</h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="data/OwnedMung.kt" data-path="app/src/main/java/com/example/mungtimer/data/OwnedMung.kt">
+package com.example.mungtimer.data
+
+import androidx.room3.Entity
+import androidx.room3.PrimaryKey
+
+// 내가 얻은 뭉 한 마리 = owned_mung 표의 한 줄
+// (어떤 뭉인지는 mungId만 저장한다. 이름·이모지·등급은 MungCatalog에서 찾으면 된다)
+@Entity(tableName = "owned_mung")
+data class OwnedMung(
+    @PrimaryKey(autoGenerate = true)    // 줄마다 겹치지 않는 번호. 0으로 넣으면 Room이 자동으로 매긴다
+    val id: Long = 0,
+    val mungId: Int,                    // MungCatalog의 id
+    val obtainedAt: Long,               // 얻은 시각(ms)
+    val studyMinutes: Int,              // 그때 공부한 시간(분)
+)
+  </script>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="data/StudySession.kt" data-path="app/src/main/java/com/example/mungtimer/data/StudySession.kt">
+package com.example.mungtimer.data
+
+import androidx.room3.Entity
+import androidx.room3.PrimaryKey
+import java.time.LocalDate
+
+// 공부 한 번(시작~종료) = study_session 표의 한 줄
+@Entity(tableName = "study_session")
+data class StudySession(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val dateKey: String,                // 공부를 끝낸 날짜. "2026-11-10" 형태라 글자 순서 = 날짜 순서
+    val seconds: Long,                  // 공부한 시간(초)
+    val endedAt: Long,                  // 끝낸 시각(ms)
+)
+
+// 오늘 날짜를 "2026-11-10" 형태의 문자열로
+fun todayKey(): String = LocalDate.now().toString()
+  </script>
+
+  <h3>예제 4. DAO — 부탁할 수 있는 일의 목록</h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="data/MungDao.kt" data-path="app/src/main/java/com/example/mungtimer/data/MungDao.kt">
+package com.example.mungtimer.data
+
+import androidx.room3.Dao
+import androidx.room3.Insert
+import androidx.room3.Query
+import kotlinx.coroutines.flow.Flow
+
+// interface: "이런 함수들이 있다"는 목록만 적는다. 실제 구현은 Room(KSP)이 만들어 준다
+@Dao
+interface MungDao {
+
+    // 한 줄 넣기. 디스크에 쓰는 일이라 suspend (코루틴 안에서 호출)
+    @Insert
+    suspend fun insert(mung: OwnedMung)
+
+    // 얻은 뭉 전체를 최근 것부터. Flow라서 표가 바뀔 때마다 새 목록이 흘러나온다
+    @Query("SELECT * FROM owned_mung ORDER BY obtainedAt DESC")
+    fun observeAll(): Flow<List<OwnedMung>>
+
+    // 지금 몇 마리인지 한 번만 물어보기 (내일 그룹에 올릴 때 사용)
+    @Query("SELECT COUNT(*) FROM owned_mung")
+    suspend fun count(): Int
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="data/StudyDao.kt" data-path="app/src/main/java/com/example/mungtimer/data/StudyDao.kt">
+package com.example.mungtimer.data
+
+import androidx.room3.Dao
+import androidx.room3.Insert
+import androidx.room3.Query
+
+// 질문의 결과를 담는 그릇. SELECT가 돌려주는 칸 이름(dateKey, seconds)과 프로퍼티 이름이 같아야 한다
+data class DailyTotal(
+    val dateKey: String,
+    val seconds: Long,
+)
+
+@Dao
+interface StudyDao {
+
+    @Insert
+    suspend fun insert(session: StudySession)
+
+    // fromDateKey 이후의 기록을 날짜별로 묶어 합계를 구한다 (내일 그룹 랭킹에 올릴 데이터)
+    @Query(
+        "SELECT dateKey, SUM(seconds) AS seconds FROM study_session " +
+            "WHERE dateKey >= :fromDateKey GROUP BY dateKey"
+    )
+    suspend fun dailyTotalsSince(fromDateKey: String): List<DailyTotal>
+}
+  </script>
+
+  <h3>예제 5. Database — 전부 연결하기</h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="data/AppDatabase.kt" data-path="app/src/main/java/com/example/mungtimer/data/AppDatabase.kt">
+package com.example.mungtimer.data
+
+import android.content.Context
+import androidx.room3.Database
+import androidx.room3.Room
+import androidx.room3.RoomDatabase
+import androidx.sqlite.driver.AndroidSQLiteDriver
+
+// entities: 이 DB에 들어갈 표들.  version: 표의 모양을 바꿀 때마다 올리는 번호
+@Database(
+    entities = [OwnedMung::class, StudySession::class],
+    version = 1,
+    exportSchema = false,
+)
+abstract class AppDatabase : RoomDatabase() {
+
+    // DAO를 꺼내는 함수. 구현은 Room이 만든다
+    abstract fun mungDao(): MungDao
+    abstract fun studyDao(): StudyDao
+
+    // companion object: 객체를 만들지 않고 AppDatabase.getInstance(…) 처럼 클래스 이름으로 부르는 곳
+    companion object {
+        private var instance: AppDatabase? = null
+
+        // DB는 만드는 비용이 커서 앱 전체에서 하나만 만들어 함께 쓴다.
+        // (ViewModel은 모두 메인 스레드에서 만들어지므로 이 정도의 단순한 구현으로 충분하다)
+        fun getInstance(context: Context): AppDatabase {
+            val existing = instance
+            if (existing != null) return existing
+
+            val created = Room.databaseBuilder<AppDatabase>(context.applicationContext, "mung.db")
+                .setDriver(AndroidSQLiteDriver())   // 안드로이드에 내장된 SQLite를 사용 (Room 3에서 필수)
+                .build()
+            instance = created
+            return created
+        }
+    }
+}
+  </script>
+</section>
+
+<section class="sec" data-sec="studio">
+  <h3>A. KSP 플러그인과 Room 추가하기</h3>
+  <p>Room은 빌드할 때 코드를 만들어 주는 도구(KSP)가 필요해서, 파일 <b>두 개</b>를 고칩니다.</p>
+  <ol class="steps">
+    <li><span class="menu-path">Gradle Scripts → build.gradle.kts (Project: MungTimer)</span>를 열고 <code>plugins { }</code> 블록에 한 줄을 추가합니다.
+      <script type="text/plain" class="code" data-lang="kts" data-title="build.gradle.kts (Project: MungTimer) — plugins 블록에 추가" data-hl="4-5">
+plugins {
+    // … 마법사가 만든 기존 줄들은 그대로 둔다 …
+
+    // Day 5: Room이 쓰는 코드 생성 도구
+    id("com.google.devtools.ksp") version "2.3.13" apply false
+}
+      </script>
+    </li>
+    <li><span class="menu-path">build.gradle.kts (Module :app)</span>을 열고 맨 위 <code>plugins { }</code> 블록에 한 줄, 맨 아래 <code>dependencies { }</code> 블록에 두 줄을 추가합니다.
+      <script type="text/plain" class="code" data-lang="kts" data-title="app/build.gradle.kts — 두 군데에 추가" data-hl="4-5,13-15">
+plugins {
+    // … 기존 줄들 …
+
+    // Day 5
+    id("com.google.devtools.ksp")
+}
+
+// … android { } 블록은 그대로 …
+
+dependencies {
+    // … 기존 줄들과 Day 4에 추가한 줄들 …
+
+    // Day 5: Room (기기 안 데이터베이스)
+    implementation("androidx.room3:room3-runtime:3.0.3")
+    ksp("androidx.room3:room3-compiler:3.0.3")          // implementation이 아니라 ksp !
+}
+      </script>
+    </li>
+    <li><b>Sync Now</b>를 누르고 오류 없이 끝나는지 확인합니다.</li>
+  </ol>
+  <div class="note warn"><b>자주 하는 실수</b> — ① 두 번째 줄을 <code>implementation(…room3-compiler…)</code>로 적으면 빌드는 되지만 실행하자마자 "AppDatabase_Impl does not exist" 오류로 죽습니다. 반드시 <code>ksp(…)</code>입니다. ② 인터넷 글을 따라 <code>org.jetbrains.kotlin.android</code>나 <code>kotlin-kapt</code> 플러그인을 추가하지 마세요. 최신 안드로이드 스튜디오 프로젝트에서는 필요 없고, 넣으면 오류가 납니다.</div>
+
+  <h3>B. Database Inspector로 저장된 데이터 보기</h3>
+  <ol class="steps">
+    <li>앱을 기기에서 <b>실행한 상태</b>로 둡니다. (API 26 이상 기기에서 동작합니다.)</li>
+    <li>아래쪽 도구 창에서 <b>App Inspection</b>을 엽니다. 안 보이면 <kbd>Shift</kbd> 두 번 → "App Inspection".</li>
+    <li><b>Database Inspector</b> 탭에서 <code>mung.db</code> → <code>owned_mung</code>을 더블클릭하면 표가 그대로 보입니다. DB는 앱이 처음 사용할 때 만들어지므로, 목록이 비어 있으면 도감 화면을 한 번 열어 주세요.</li>
+    <li><b>Live updates</b>를 체크하면, 앱에서 뭉을 뽑는 순간 줄이 추가되는 것을 볼 수 있습니다.</li>
+    <li>표 위의 <b>쿼리 창</b> 아이콘을 눌러 <code>SELECT COUNT(*) FROM owned_mung</code> 같은 SQL을 직접 실행해 볼 수도 있습니다.</li>
+  </ol>
+
+  <h3>C. 뽑기를 빨리 시험하는 법</h3>
+  <ol class="steps">
+    <li><code>timer/TimeUtils.kt</code>의 <code>MIN_SECONDS_FOR_MUNG = 30 * 60L</code>을 <code>10L</code>로 바꾸고 실행합니다. 10초만 지나면 뭉이 나옵니다(확률은 30분 구간이 적용됩니다).</li>
+    <li>여러 번 뽑아 도감이 채워지는 것, 앱을 껐다 켜도 남아 있는 것을 확인합니다.</li>
+    <li><b>시험이 끝나면 반드시 <code>30 * 60L</code>로 되돌립니다.</b></li>
+  </ol>
+
+  <h3>D. 표의 모양(Entity)을 바꿨더니 앱이 죽을 때</h3>
+  <p>Entity에 프로퍼티를 추가하거나 이름을 바꾸면, 기기에 이미 만들어진 예전 모양의 DB와 맞지 않아 앱이 시작하자마자 죽습니다(Logcat에 <code>Room cannot verify the data integrity</code>).</p>
+  <ul>
+    <li><b>개발 중 해결법</b>: 기기에서 앱을 <b>삭제</b>(또는 설정 → 앱 → 저장공간 → 데이터 삭제)하고 다시 실행합니다. 새 모양으로 DB가 다시 만들어집니다.</li>
+    <li>실제 서비스에서는 <code>version</code>을 올리고 "마이그레이션"을 작성해 사용자 데이터를 보존합니다. 이 과정은 7일 범위 밖이니, <b>Entity는 오늘 정한 모양을 끝까지 유지</b>합시다.</li>
+  </ul>
+
+  <h3>오늘의 단축키</h3>
+  <div class="table-wrap"><table>
+    <tr><th>기능</th><th>Windows / Linux</th><th>macOS</th></tr>
+    <tr><td>프로젝트 전체에서 글자 찾기</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></td><td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></td></tr>
+    <tr><td>이 함수/클래스를 쓰는 곳 찾기</td><td><kbd>Alt</kbd>+<kbd>F7</kbd></td><td><kbd>Option</kbd>+<kbd>F7</kbd></td></tr>
+    <tr><td>파일 이름으로 열기</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td><td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd></td></tr>
+    <tr><td>선택 영역을 중괄호/if 등으로 감싸기</td><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd></td><td><kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>T</kbd></td></tr>
+  </table></div>
+</section>
+
+<section class="sec" data-sec="quiz">
+  <div class="q" data-type="mc" data-answer="2">
+    <p class="q-title">30~59분 구간(일반 70 / 희귀 25 / 영웅 4 / 전설 1)에서 <code>roll</code>이 <b>72</b>가 나왔습니다. 어떤 등급일까요?</p>
+    <ul class="q-options">
+      <li>일반</li>
+      <li>희귀</li>
+      <li>영웅</li>
+      <li>전설</li>
+    </ul>
+    <div class="q-explain"><p>누적 값은 70 → 95 → 99 → 100입니다. 72는 70보다 작지 않으므로 일반을 지나치고, 95보다 작으므로 희귀입니다. 희귀에 당첨되는 번호는 70~94의 25칸입니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="nextInt">
+    <p class="q-title">0 이상 100 미만의 정수 하나를 무작위로 뽑으려고 합니다. 빈칸은?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+val roll = Random.____(100)
+    </script>
+    <div class="q-explain"><p><code>Random.nextInt(100)</code>은 0, 1, …, 99 중 하나를 같은 확률로 돌려줍니다. 100은 나오지 않습니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="3">
+    <p class="q-title">실수로 확률표를 일반 70 / 희귀 25 / 영웅 4 / 전설 <b>0</b>(합계 99)으로 만들었습니다. 예제 1의 <code>drawGrade()</code>는 어떻게 동작할까요?</p>
+    <ul class="q-options">
+      <li>컴파일 오류가 난다</li>
+      <li>100번에 1번꼴로 앱이 죽는다</li>
+      <li>roll이 99일 때 어느 구간에도 걸리지 않아, 반복문 뒤의 안전장치인 COMMON이 반환된다</li>
+      <li>아무 문제 없이 설계대로 동작한다</li>
+    </ul>
+    <div class="q-explain"><p>누적 값이 99에서 끝나므로 roll = 99는 <code>roll &lt; cumulative</code>를 한 번도 만족하지 못합니다. 앱이 죽지는 않지만 설계와 다른 결과가 나옵니다. 그래서 <b>합계가 100인지 확인하는 코드</b>와 <b>시뮬레이션</b>이 중요합니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="Entity">
+    <p class="q-title">이 data class를 DB의 표로 만들려고 합니다. 빈칸에 들어갈 어노테이션 이름은?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+@____(tableName = "owned_mung")
+data class OwnedMung(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val mungId: Int,
+)
+    </script>
+    <div class="q-explain"><p><code>@Entity</code>입니다. 클래스 하나가 표 하나, 프로퍼티 하나가 칸 하나, 객체 하나가 한 줄이 됩니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="1">
+    <p class="q-title">DAO의 <code>insert</code> 함수에 <code>suspend</code>를 붙이는 이유는?</p>
+    <ul class="q-options">
+      <li>디스크에 쓰는 동안 화면(메인 스레드)이 멈추지 않도록, 코루틴 안에서 기다릴 수 있게 하려고</li>
+      <li><code>suspend</code>가 있어야 데이터가 암호화돼서</li>
+      <li>함수 이름이 insert이면 문법상 반드시 붙여야 해서</li>
+      <li>앱을 꺼도 데이터가 남게 하려고</li>
+    </ul>
+    <div class="q-explain"><p>어제의 진동벨 비유와 같습니다. Room 3에서는 DAO 함수가 <code>suspend</code>이거나 <code>Flow</code>를 돌려줘야만 합니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="4">
+    <p class="q-title">DAO 함수가 <code>Flow&lt;List&lt;OwnedMung&gt;&gt;</code>를 돌려줄 때의 특징은?</p>
+    <ul class="q-options">
+      <li>호출할 때 딱 한 번만 목록을 준다</li>
+      <li>1초마다 DB를 다시 읽는다</li>
+      <li>앱을 다시 켜야 새 데이터가 보인다</li>
+      <li>표의 내용이 바뀔 때마다 새 목록을 자동으로 내보낸다</li>
+    </ul>
+    <div class="q-explain"><p>그래서 타이머 화면에서 뭉을 저장하면, 도감 화면은 아무 코드 없이도 갱신됩니다. 저장하는 쪽과 보여 주는 쪽이 서로 몰라도 되는 것이 큰 장점입니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="ORDER||order">
+    <p class="q-title">최근에 얻은 뭉부터 정렬해서 가져오려고 합니다. 빈칸에 들어갈 SQL 키워드는?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+@Query("SELECT * FROM owned_mung ____ BY obtainedAt DESC")
+fun observeAll(): Flow<List<OwnedMung>>
+    </script>
+    <div class="q-explain"><p><code>ORDER BY 칸이름 DESC</code>는 큰 값부터(내림차순), <code>ASC</code>는 작은 값부터입니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="2">
+    <p class="q-title">공부 시간이 정확히 <b>120분</b>일 때 전설 등급이 나올 확률은? (확률표는 개념 설명 1번 참고)</p>
+    <ul class="q-options">
+      <li>3%</li>
+      <li>6%</li>
+      <li>10%</li>
+      <li>1%</li>
+    </ul>
+    <div class="q-explain"><p>120분은 "120~179분" 구간의 시작이므로 6%입니다. 코드에서는 확률표를 <b>긴 시간부터</b>(180 → 120 → 60 → 30) 적어 두고 <code>firstOrNull { minutes &gt;= it.minMinutes }</code>로 처음 맞는 줄을 고릅니다. 순서를 거꾸로 적으면 모든 시간이 30분 구간에 걸리는 버그가 생깁니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="3">
+    <p class="q-title"><code>OwnedMung</code>에 프로퍼티를 하나 추가하고 실행했더니 앱이 시작하자마자 죽었습니다. 개발 중에 쓸 수 있는 가장 간단한 해결법은?</p>
+    <ul class="q-options">
+      <li>안드로이드 스튜디오를 재설치한다</li>
+      <li><code>ksp(…)</code>를 <code>implementation(…)</code>으로 바꾼다</li>
+      <li>기기에서 앱을 삭제(또는 앱 데이터 삭제)한 뒤 다시 실행한다</li>
+      <li>DAO의 <code>suspend</code>를 모두 지운다</li>
+    </ul>
+    <div class="q-explain"><p>기기에 남아 있는 예전 모양의 DB와 새 Entity가 맞지 않아서 생기는 문제입니다. 앱을 삭제하면 DB도 지워져 새 모양으로 다시 만들어집니다(저장된 뭉도 사라집니다).</p></div>
+  </div>
+</section>
+
+<section class="sec" data-sec="task">
+  <h3>과제: 뭉 뽑기와 뭉 도감 만들기</h3>
+  <p>예제 3~5의 <code>data</code> 패키지 파일 5개가 준비되어 있어야 합니다. 그 위에 ① 뽑기 로직 ② 종료 시 저장 + 결과 창 ③ 도감 화면 ④ 탭 전환을 만듭니다.</p>
+  <div class="phones">
+    <div class="phone" aria-label="뽑기 결과 창 예시">
+      <b>뭉을 만났어요!</b>
+      <div style="font-size:2.6rem;margin-top:6px">🍓</div>
+      <b>딸기뭉</b>
+      <div style="color:#4F9FF0;font-weight:700">희귀 ★★</div>
+      <div style="font-size:.74rem">달콤한 향이 나는 뭉</div>
+      <div style="font-size:.74rem;margin-top:6px">01:12:40 공부 완료!</div>
+      <div class="row"><span class="pbtn">도감에 넣기</span></div>
+    </div>
+    <div class="phone" aria-label="도감 화면 예시">
+      <b>뭉 도감</b> <span style="font-size:.74rem">3 / 12종 · 총 4마리</span>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px;font-size:.7rem">
+        <span><span style="font-size:1.4rem">🌱</span><br>콩뭉 ×2</span><span><span style="font-size:1.4rem">❔</span><br>???</span><span><span style="font-size:1.4rem">🍃</span><br>잎뭉 ×1</span>
+        <span><span style="font-size:1.4rem">❔</span><br>???</span><span><span style="font-size:1.4rem">❔</span><br>???</span><span><span style="font-size:1.4rem">🍓</span><br>딸기뭉 ×1</span>
+      </div>
+      <div class="tabs"><span>⏱️ 타이머</span><b>📖 도감</b></div>
+    </div>
+  </div>
+
+  <h4>요구사항 체크리스트</h4>
+  <ul class="checklist">
+    <li>Gradle에 KSP 플러그인과 Room 의존성을 추가했고, 예제 3~5의 <code>data</code> 패키지 파일 5개를 작성했다</li>
+    <li><code>model/MungGacha.kt</code> — 시간대별 확률표(<code>table</code>), 구간 찾기(<code>rowFor</code>), 등급 뽑기(<code>drawGrade</code>), 뭉 뽑기(<code>draw</code>)를 구현했다. 각 줄의 확률 합계는 100</li>
+    <li>Playground에서 구간별로 10만 번 뽑아 실제 비율이 확률표와 비슷한지 확인했다</li>
+    <li><code>TimerViewModel.finish()</code>가 ① 공부 기록(<code>StudySession</code>) 저장 ② 30분 이상이면 뽑기 + <code>OwnedMung</code> 저장 ③ 결과를 <code>uiState.result</code>에 담기를 수행한다</li>
+    <li>결과 창: 뭉이 나오면 이모지 · 이름 · 등급(색과 별) · 설명을, 30분 미만이면 <code>resultMessage()</code> 안내 문구만 보여 준다</li>
+    <li><code>collection/CollectionViewModel.kt</code> — <code>mungDao.observeAll()</code>을 도감용 상태(<code>CollectionUiState</code>)로 바꿔 공개한다</li>
+    <li><code>collection/CollectionScreen.kt</code> — 전체 12종을 3칸 격자로 보여 준다. 얻은 뭉은 이모지와 마리 수, 못 얻은 뭉은 "?"로 표시. 얻은 뭉을 누르면 상세 창</li>
+    <li><code>MainActivity</code>에 하단 탭(타이머 / 도감)을 만들고 상태 변수로 화면을 바꾼다</li>
+    <li>시험 통과: 뭉을 뽑으면 도감에 바로 나타나고, 앱을 종료했다 켜도 남아 있다. Database Inspector에서 줄이 추가된 것을 확인했다</li>
+  </ul>
+
+  <details class="hint"><summary>힌트 1 — 확률표를 데이터로</summary>
+    <p><code>data class GachaRow(val minMinutes: Int, val rates: Map&lt;MungGrade, Int&gt;)</code>를 만들고, <code>val table = listOf(GachaRow(180, mapOf(…)), GachaRow(120, …), GachaRow(60, …), GachaRow(30, …))</code>처럼 <b>긴 시간부터</b> 적습니다. <code>rowFor(minutes)</code>는 <code>table.firstOrNull { minutes &gt;= it.minMinutes } ?: table.last()</code>. "30분 미만이면 뽑지 않는다"는 판단은 Day 1의 <code>canGetMung()</code>에 맡깁니다.</p>
+  </details>
+  <details class="hint"><summary>힌트 2 — finish()에서 저장하기</summary>
+    <p>DB 저장은 suspend 함수이므로 <code>viewModelScope.launch { … }</code> 안에서 합니다. 순서: 총 시간 계산 → 타이머 초기화(여기까지는 어제와 같음) → <code>launch</code> 안에서 <code>studyDao.insert(…)</code> → <code>if (canGetMung(totalSeconds)) MungGacha.draw(totalSeconds / 60) else null</code> → null이 아니면 <code>mungDao.insert(…)</code> → <code>_uiState.update { it.copy(result = FinishResult(totalSeconds, mung)) }</code>.</p>
+  </details>
+  <details class="hint"><summary>힌트 3 — Flow를 화면 상태로</summary>
+    <p><code>val uiState: StateFlow&lt;CollectionUiState&gt; = mungDao.observeAll().map { owned -&gt; … }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CollectionUiState())</code>. <code>map</code> 안에서 <code>MungCatalog.all.map { mung -&gt; CollectionItem(mung, owned.count { it.mungId == mung.id }) }</code>로 "전체 12종 + 각각 몇 마리"를 만듭니다.</p>
+  </details>
+  <details class="hint"><summary>힌트 4 — 격자와 탭</summary>
+    <p>격자: <code>LazyVerticalGrid(columns = GridCells.Fixed(3)) { items(uiState.items) { item -&gt; MungCell(item) } }</code>. 탭: <code>var currentTab by rememberSaveable { mutableIntStateOf(0) }</code>를 두고, <code>Scaffold(bottomBar = { NavigationBar { NavigationBarItem(…) } })</code>와 <code>when (currentTab)</code>으로 화면을 고릅니다. <code>rememberSaveable</code>은 회전해도 값을 기억하는 <code>remember</code>입니다.</p>
+  </details>
+
+  <details class="answer"><summary>모범 답안 보기</summary>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="model/MungGacha.kt" data-path="app/src/main/java/com/example/mungtimer/model/MungGacha.kt">
+package com.example.mungtimer.model
+
+import kotlin.random.Random
+
+// 확률표의 한 줄: "공부 시간이 minMinutes분 이상이면 이 확률을 쓴다"
+data class GachaRow(
+    val minMinutes: Int,
+    val rates: Map<MungGrade, Int>,     // 등급 → 확률(%). 합계는 반드시 100
+)
+
+object MungGacha {
+
+    // 시간대별 확률표. 긴 시간부터 적는다 (위에서부터 처음 맞는 줄을 쓰기 때문)
+    val table: List<GachaRow> = listOf(
+        GachaRow(
+            minMinutes = 180,
+            rates = mapOf(
+                MungGrade.COMMON to 25, MungGrade.RARE to 40,
+                MungGrade.EPIC to 25, MungGrade.LEGENDARY to 10,
+            ),
+        ),
+        GachaRow(
+            minMinutes = 120,
+            rates = mapOf(
+                MungGrade.COMMON to 40, MungGrade.RARE to 37,
+                MungGrade.EPIC to 17, MungGrade.LEGENDARY to 6,
+            ),
+        ),
+        GachaRow(
+            minMinutes = 60,
+            rates = mapOf(
+                MungGrade.COMMON to 55, MungGrade.RARE to 32,
+                MungGrade.EPIC to 10, MungGrade.LEGENDARY to 3,
+            ),
+        ),
+        GachaRow(
+            minMinutes = 30,
+            rates = mapOf(
+                MungGrade.COMMON to 70, MungGrade.RARE to 25,
+                MungGrade.EPIC to 4, MungGrade.LEGENDARY to 1,
+            ),
+        ),
+    )
+
+    // 공부 시간(분)에 맞는 확률표 줄. 가장 낮은 구간에도 못 미치면 마지막(30분) 줄을 쓴다.
+    // "30분 미만이면 뽑지 않는다"는 판단은 부르는 쪽(canGetMung)이 한다
+    fun rowFor(studyMinutes: Long): GachaRow =
+        table.firstOrNull { studyMinutes >= it.minMinutes } ?: table.last()
+
+    // 등급 뽑기: 0~99 주사위를 굴려, 누적 확률 구간에 따라 등급을 정한다
+    fun drawGrade(row: GachaRow, random: Random = Random.Default): MungGrade {
+        val roll = random.nextInt(100)
+        var cumulative = 0
+        for (grade in MungGrade.entries) {
+            cumulative += row.rates[grade] ?: 0
+            if (roll < cumulative) return grade
+        }
+        return MungGrade.COMMON             // 합계가 100이면 여기까지 오지 않는다 (안전장치)
+    }
+
+    // 뭉 뽑기: ① 등급을 확률로 정하고 ② 그 등급에서 한 마리를 고르게 뽑는다
+    fun draw(studyMinutes: Long, random: Random = Random.Default): Mung {
+        val grade = drawGrade(rowFor(studyMinutes), random)
+        return MungCatalog.byGrade(grade).random(random)
+    }
+}
+    </script>
+    <p><b>Playground에서 검증하기:</b> Day 2의 세 파일(<code>MungGrade</code>, <code>Mung</code>, <code>MungCatalog</code>)과 위 <code>MungGacha</code>의 내용을 <code>package</code> 줄만 빼고 붙여 넣은 뒤(<code>import kotlin.random.Random</code>은 맨 위로), 아래 <code>main</code>을 추가합니다.</p>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="확인용 main" data-run="d5_task" data-run-include="app/src/main/java/com/example/mungtimer/model/MungGrade.kt,app/src/main/java/com/example/mungtimer/model/Mung.kt,app/src/main/java/com/example/mungtimer/model/MungCatalog.kt,app/src/main/java/com/example/mungtimer/model/MungGacha.kt">
+fun main() {
+    // 1) 확률표 자체를 검사: 모든 줄의 합계가 100인가
+    for (row in MungGacha.table) {
+        println("${row.minMinutes}분 이상: 합계 ${row.rates.values.sum()}")
+    }
+
+    // 2) 구간이 올바르게 골라지는가 (경계값 확인)
+    for (minutes in listOf(30L, 59L, 60L, 119L, 120L, 179L, 180L, 600L)) {
+        println("${minutes}분 → ${MungGacha.rowFor(minutes).minMinutes}분 구간")
+    }
+
+    // 3) 구간별로 10만 번씩 뽑아 실제 비율 확인
+    val total = 100_000
+    for (minutes in listOf(45L, 90L, 150L, 200L)) {
+        val drawn = List(total) { MungGacha.draw(minutes) }     // 뭉 10만 마리 목록
+        val summary = MungGrade.entries.map { grade ->
+            val percent = drawn.count { it.grade == grade } * 100.0 / total
+            "${grade.label} $percent%"
+        }
+        println("${minutes}분 공부: $summary")
+    }
+}
+    </script>
+    <script type="text/plain" class="code" data-lang="output" data-for="d5_task">
+180분 이상: 합계 100
+120분 이상: 합계 100
+60분 이상: 합계 100
+30분 이상: 합계 100
+30분 → 30분 구간
+59분 → 30분 구간
+60분 → 60분 구간
+119분 → 60분 구간
+120분 → 120분 구간
+179분 → 120분 구간
+180분 → 180분 구간
+600분 → 180분 구간
+45분 공부: [일반 70.021%, 희귀 24.98%, 영웅 4.012%, 전설 0.987%]      ← (랜덤) 실행할 때마다 조금씩 달라져요
+90분 공부: [일반 54.91%, 희귀 32.104%, 영웅 9.958%, 전설 3.028%]
+150분 공부: [일반 40.127%, 희귀 36.89%, 영웅 16.961%, 전설 6.022%]
+200분 공부: [일반 24.936%, 희귀 40.011%, 영웅 25.108%, 전설 9.945%]
+    </script>
+
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="timer/TimerViewModel.kt (Day 5 버전 — 파일 전체 교체)" data-path="app/src/main/java/com/example/mungtimer/timer/TimerViewModel.kt" data-hl="8-13,28-32,38,47-50,86-107,112">
+package com.example.mungtimer.timer
+
+import android.app.Application
+import android.content.Context
+import androidx.core.content.edit
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.mungtimer.data.AppDatabase
+import com.example.mungtimer.data.OwnedMung
+import com.example.mungtimer.data.StudySession
+import com.example.mungtimer.data.todayKey
+import com.example.mungtimer.model.Mung
+import com.example.mungtimer.model.MungGacha
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
+// 저장할 때 쓰는 이름표들
+private const val KEY_STATUS = "status"
+private const val KEY_STARTED_AT = "startedAt"
+private const val KEY_ACCUMULATED = "accumulated"
+
+// 종료 결과: 공부한 시간과, 나온 뭉 (30분 미만이면 null)
+data class FinishResult(
+    val studySeconds: Long,
+    val mung: Mung?,
+)
+
+// 타이머 화면에 필요한 모든 값
+data class TimerUiState(
+    val status: TimerStatus = TimerStatus.IDLE,
+    val elapsedSeconds: Long = 0,
+    val result: FinishResult? = null,       // 방금 종료한 결과. null이면 결과 창을 띄우지 않는다
+)
+
+// AndroidViewModel: 저장소를 쓰기 위해 Application(앱 전체를 대표하는 객체)을 받는 ViewModel
+class TimerViewModel(application: Application) : AndroidViewModel(application) {
+
+    // 값 몇 개를 기기에 저장하는 작은 메모장
+    private val prefs = application.getSharedPreferences("timer", Context.MODE_PRIVATE)
+
+    // 데이터베이스의 사서(DAO) 두 명
+    private val database = AppDatabase.getInstance(application)
+    private val mungDao = database.mungDao()
+    private val studyDao = database.studyDao()
+
+    private val _uiState = MutableStateFlow(TimerUiState())
+    val uiState: StateFlow<TimerUiState> = _uiState.asStateFlow()
+
+    private var startedAt = 0L          // 지금 구간을 시작한 시각(ms). 멈춰 있으면 0
+    private var accumulated = 0L        // 이전 구간들에서 쌓인 시간(ms)
+    private var tickJob: Job? = null    // 화면 갱신 코루틴의 리모컨
+
+    init {
+        restore()                       // ViewModel이 만들어질 때 저장된 타이머를 이어 간다
+    }
+
+    fun start() {
+        if (_uiState.value.status == TimerStatus.RUNNING) return
+        startedAt = System.currentTimeMillis()      // 시각을 적어 둔다
+        save(TimerStatus.RUNNING)
+        startTicking()
+    }
+
+    fun pause() {
+        if (_uiState.value.status != TimerStatus.RUNNING) return
+        tickJob?.cancel()
+        accumulated = elapsedMillis()               // 지금까지의 시간을 쌓아 두고
+        startedAt = 0L                              // 멈춤 표시
+        save(TimerStatus.PAUSED)
+        _uiState.update { it.copy(status = TimerStatus.PAUSED, elapsedSeconds = accumulated / 1000) }
+    }
+
+    fun finish() {
+        if (_uiState.value.status == TimerStatus.IDLE) return
+        tickJob?.cancel()
+        val totalSeconds = elapsedMillis() / 1000   // 초기화하기 전에 총 시간을 먼저 구한다
+        startedAt = 0L
+        accumulated = 0L
+        save(TimerStatus.IDLE)
+        _uiState.update { TimerUiState() }          // 화면은 바로 처음 상태로
+
+        // DB 저장은 suspend 함수 → 코루틴 안에서
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+
+            // ① 공부 기록 저장 (내일 그룹 랭킹의 재료)
+            if (totalSeconds > 0) {
+                studyDao.insert(StudySession(dateKey = todayKey(), seconds = totalSeconds, endedAt = now))
+            }
+
+            // ② 30분 이상이면 뭉을 뽑아 도감에 저장
+            val mung = if (canGetMung(totalSeconds)) MungGacha.draw(totalSeconds / 60) else null
+            if (mung != null) {
+                mungDao.insert(
+                    OwnedMung(mungId = mung.id, obtainedAt = now, studyMinutes = (totalSeconds / 60).toInt())
+                )
+            }
+
+            // ③ 결과 창 띄우기
+            _uiState.update { it.copy(result = FinishResult(totalSeconds, mung)) }
+        }
+    }
+
+    // 결과 창을 닫는다
+    fun dismissResult() {
+        _uiState.update { it.copy(result = null) }
+    }
+
+    // 경과 시간(ms) = 쌓인 시간 + (지금 − 시작 시각)
+    private fun elapsedMillis(): Long {
+        if (startedAt == 0L) return accumulated
+        val runningPart = System.currentTimeMillis() - startedAt
+        return accumulated + runningPart.coerceAtLeast(0L)   // 기기 시계가 뒤로 바뀌어도 음수는 되지 않게
+    }
+
+    // 0.5초마다 시계를 다시 읽어 화면 상태를 갱신한다. "세는" 것이 아니라 "읽는" 것!
+    private fun startTicking() {
+        tickJob?.cancel()
+        tickJob = viewModelScope.launch {
+            while (isActive) {
+                _uiState.update {
+                    it.copy(status = TimerStatus.RUNNING, elapsedSeconds = elapsedMillis() / 1000)
+                }
+                delay(500)
+            }
+        }
+    }
+
+    private fun save(status: TimerStatus) {
+        prefs.edit {
+            putString(KEY_STATUS, status.name)      // enum → "RUNNING" 같은 문자열
+            putLong(KEY_STARTED_AT, startedAt)
+            putLong(KEY_ACCUMULATED, accumulated)
+        }
+    }
+
+    private fun restore() {
+        val savedStatus = prefs.getString(KEY_STATUS, null) ?: return   // 저장된 적이 없으면 그대로 시작
+        startedAt = prefs.getLong(KEY_STARTED_AT, 0L)
+        accumulated = prefs.getLong(KEY_ACCUMULATED, 0L)
+
+        when (TimerStatus.valueOf(savedStatus)) {   // 문자열 → enum
+            TimerStatus.RUNNING -> startTicking()   // 시작 시각이 그대로라 경과 시간은 저절로 맞는다
+            TimerStatus.PAUSED -> _uiState.update {
+                it.copy(status = TimerStatus.PAUSED, elapsedSeconds = accumulated / 1000)
+            }
+            TimerStatus.IDLE -> Unit                // 할 일 없음
+        }
+    }
+}
+    </script>
+    <p>초록색으로 표시된 줄이 어제와 달라진 부분입니다.</p>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="timer/TimerScreen.kt (Day 5 버전 — 파일 전체 교체)" data-path="app/src/main/java/com/example/mungtimer/timer/TimerScreen.kt">
+package com.example.mungtimer.timer
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+
+@Composable
+fun TimerScreen(
+    modifier: Modifier = Modifier,
+    viewModel: TimerViewModel = viewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    TimerContent(
+        status = uiState.status,
+        elapsedSeconds = uiState.elapsedSeconds,
+        onStart = { viewModel.start() },
+        onPause = { viewModel.pause() },
+        onFinish = { viewModel.finish() },
+        modifier = modifier,
+    )
+
+    val result = uiState.result
+    if (result != null) {
+        ResultDialog(result = result, onDismiss = { viewModel.dismissResult() })
+    }
+}
+
+// 종료 결과 창: 뭉이 나왔으면 뭉을, 아니면 안내 문구를 보여 준다
+@Composable
+fun ResultDialog(result: FinishResult, onDismiss: () -> Unit) {
+    val mung = result.mung
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (mung != null) "뭉을 만났어요!" else "공부 끝!") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (mung != null) {
+                    val gradeColor = Color(mung.grade.colorHex)
+                    val stars = "★".repeat(mung.grade.stars)
+
+                    Box(
+                        modifier = Modifier
+                            .size(96.dp)
+                            .clip(CircleShape)
+                            .background(gradeColor),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(text = mung.emoji, fontSize = 48.sp)
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(text = mung.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(text = "${mung.grade.label} $stars", color = gradeColor, fontWeight = FontWeight.Bold)
+                    Text(text = mung.description, textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(text = "${formatTime(result.studySeconds)} 공부 완료!")
+                } else {
+                    // 30분 미만: 뭉 없이 안내 메시지만
+                    Text(text = resultMessage(result.studySeconds), textAlign = TextAlign.Center)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(if (mung != null) "도감에 넣기" else "확인")
+            }
+        },
+    )
+}
+    </script>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="collection/CollectionViewModel.kt" data-path="app/src/main/java/com/example/mungtimer/collection/CollectionViewModel.kt">
+package com.example.mungtimer.collection
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.mungtimer.data.AppDatabase
+import com.example.mungtimer.data.OwnedMung
+import com.example.mungtimer.model.Mung
+import com.example.mungtimer.model.MungCatalog
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+
+// 도감의 한 칸: 어떤 뭉을 몇 마리 가졌는지 (0이면 아직 못 얻음)
+data class CollectionItem(
+    val mung: Mung,
+    val count: Int,
+)
+
+data class CollectionUiState(
+    val items: List<CollectionItem> = emptyList(),
+    val ownedKinds: Int = 0,        // 모은 종류 수
+    val totalCount: Int = 0,        // 모은 마리 수
+)
+
+class CollectionViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val mungDao = AppDatabase.getInstance(application).mungDao()
+
+    // DB의 Flow(수도관) → 도감용 상태로 변환(map) → StateFlow(전광판)로 연결(stateIn)
+    val uiState: StateFlow<CollectionUiState> = mungDao.observeAll()
+        .map { owned -> buildUiState(owned) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),    // 화면이 보고 있을 때만 DB를 관찰 (5초 여유)
+            initialValue = CollectionUiState(),                 // DB에서 첫 값이 오기 전에 보여 줄 값
+        )
+
+    // "얻은 뭉 목록" → "전체 12종 각각을 몇 마리 가졌는지"
+    private fun buildUiState(owned: List<OwnedMung>): CollectionUiState {
+        val items = MungCatalog.all.map { mung ->
+            CollectionItem(mung = mung, count = owned.count { it.mungId == mung.id })
+        }
+        return CollectionUiState(
+            items = items,
+            ownedKinds = items.count { it.count > 0 },
+            totalCount = owned.size,
+        )
+    }
+}
+    </script>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="collection/CollectionScreen.kt" data-path="app/src/main/java/com/example/mungtimer/collection/CollectionScreen.kt">
+package com.example.mungtimer.collection
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+
+@Composable
+fun CollectionScreen(
+    modifier: Modifier = Modifier,
+    viewModel: CollectionViewModel = viewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // 지금 상세 창으로 보고 있는 칸. null이면 창이 닫힌 상태 (화면 안에서만 쓰는 값이라 remember로 충분)
+    var selected by remember { mutableStateOf<CollectionItem?>(null) }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+    ) {
+        Text(text = "뭉 도감", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(
+            text = "${uiState.ownedKinds} / ${uiState.items.size}종 · 총 ${uiState.totalCount}마리",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // LazyVerticalGrid: 화면에 보이는 칸만 그리는 격자 목록. Fixed(3) = 한 줄에 3칸
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(items = uiState.items, key = { it.mung.id }) { item ->
+                MungCell(item = item, onClick = { selected = item })
+            }
+        }
+    }
+
+    val item = selected
+    if (item != null) {
+        MungDetailDialog(item = item, onDismiss = { selected = null })
+    }
+}
+
+// 도감의 한 칸
+@Composable
+fun MungCell(item: CollectionItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val isOwned = item.count > 0
+    val mung = item.mung
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(enabled = isOwned, onClick = onClick)    // 얻은 뭉만 누를 수 있다
+            .padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(if (isOwned) Color(mung.grade.colorHex) else MaterialTheme.colorScheme.outlineVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text = if (isOwned) mung.emoji else "?", fontSize = 28.sp)
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = if (isOwned) mung.name else "???",
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+        Text(
+            text = if (isOwned) "${mung.grade.label} ×${item.count}" else mung.grade.label,
+            style = MaterialTheme.typography.labelMedium,
+        )
+    }
+}
+
+// 뭉 상세 창
+@Composable
+fun MungDetailDialog(item: CollectionItem, onDismiss: () -> Unit) {
+    val mung = item.mung
+    val stars = "★".repeat(mung.grade.stars)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("${mung.emoji} ${mung.name}") },
+        text = {
+            Column {
+                Text(
+                    text = "${mung.grade.label} $stars",
+                    color = Color(mung.grade.colorHex),
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = mung.description, textAlign = TextAlign.Start)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "지금까지 ${item.count}마리를 만났어요")
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("닫기") }
+        },
+    )
+}
+    </script>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="MainActivity.kt (Day 5 버전 — 임시 탭 전환)" data-path="app/src/main/java/com/example/mungtimer/MainActivity.kt">
+package com.example.mungtimer
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import com.example.mungtimer.collection.CollectionScreen
+import com.example.mungtimer.timer.TimerScreen
+import com.example.mungtimer.ui.theme.MungTimerTheme
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            MungTimerTheme {
+                // 지금 보고 있는 탭. 0 = 타이머, 1 = 도감
+                // rememberSaveable: 화면을 회전해도 기억하는 remember
+                var currentTab by rememberSaveable { mutableIntStateOf(0) }
+
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    bottomBar = {                       // 화면 아래 고정되는 탭 막대
+                        NavigationBar {
+                            NavigationBarItem(
+                                selected = currentTab == 0,
+                                onClick = { currentTab = 0 },
+                                icon = { Text("⏱️") },
+                                label = { Text("타이머") },
+                            )
+                            NavigationBarItem(
+                                selected = currentTab == 1,
+                                onClick = { currentTab = 1 },
+                                icon = { Text("📖") },
+                                label = { Text("도감") },
+                            )
+                        }
+                    },
+                ) { innerPadding ->
+                    // 상태에 따라 다른 화면을 그린다 (Day 7에 Navigation으로 교체)
+                    when (currentTab) {
+                        0 -> TimerScreen(modifier = Modifier.padding(innerPadding))
+                        else -> CollectionScreen(modifier = Modifier.padding(innerPadding))
+                    }
+                }
+            }
+        }
+    }
+}
+    </script>
+    <p><b>확인 포인트:</b> ① 뭉을 저장하는 <code>TimerViewModel</code>과 도감을 그리는 <code>CollectionViewModel</code>은 서로를 전혀 모릅니다. DB의 <code>Flow</code>가 둘을 이어 줍니다. ② <code>TimerContent.kt</code>는 오늘도 고치지 않았습니다. ③ 타이머가 도는 중에 도감 탭에 다녀와도 시간이 정확합니다. 어제 "시각 기록 방식"으로 만든 덕분입니다. ④ 시험이 끝나면 <code>MIN_SECONDS_FOR_MUNG</code>을 <code>30 * 60L</code>로 되돌렸는지 확인하세요.</p>
+  </details>
+</section>
+
+</template>
 <!-- =====================================================================
      ▲▲▲ 콘텐츠 데이터 끝 ▲▲▲   ▼▼▼ 동작(JS) ▼▼▼
      ===================================================================== -->
