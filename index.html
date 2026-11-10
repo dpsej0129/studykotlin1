@@ -4514,6 +4514,1638 @@ class MainActivity : ComponentActivity() {
 </section>
 
 </template>
+
+<!-- ===================== Day 6 : Firebase 연동 ===================== -->
+<template id="page-day6">
+
+<section class="sec" data-sec="goal">
+  <p>지금까지의 뭉타이머는 내 폰 안에서만 동작했습니다. 오늘은 <b>Firebase</b>라는 서버 서비스를 연결해, 친구들과 그룹을 만들고 공부 시간을 겨루게 합니다. 7일 중 <b>가장 분량이 많은 날</b>이니 시간을 넉넉히 잡으세요.</p>
+  <h3>오늘이 끝나면 할 수 있는 것</h3>
+  <ul>
+    <li>Firebase 프로젝트를 만들고 안드로이드 앱과 연결할 수 있다.</li>
+    <li>Firebase Authentication의 <b>익명 로그인</b>으로 사용자마다 고유한 ID를 받을 수 있다.</li>
+    <li>Cloud Firestore에 데이터를 쓰고, 읽고, <b>실시간으로 구독</b>할 수 있다.</li>
+    <li><code>try / catch</code>로 네트워크 오류를 처리할 수 있다.</li>
+    <li>보안 규칙으로 "내 데이터는 나만 고칠 수 있게" 지킬 수 있다.</li>
+  </ul>
+  <div class="link-app">
+    <div class="ico">🔗</div>
+    <div><b>최종 앱과의 연결</b>
+    명세 4번 <b>그룹 기능</b> 전체를 오늘 만듭니다: 그룹 생성, 초대 코드로 참여, 오늘/이번 주 공부 시간 랭킹, 대표 뭉 자랑. 어제 Room에 저장한 공부 기록과 뭉 개수가 오늘 서버로 올라갑니다.</div>
+  </div>
+  <div class="note honest"><b>오늘의 범위 조정(다시 한번 솔직하게).</b> ① 로그인은 <b>익명 로그인 + 닉네임</b>입니다. 구글 로그인은 코드 밖 설정이 많아 하루에 넣기 어렵습니다. ② 한 사람은 <b>그룹 하나</b>만 가입합니다. ③ "자랑"은 피드 대신 <b>대표 뭉 1마리</b>를 랭킹에 표시하는 방식입니다. ④ 이 사이트의 Firebase 코드는 실제 빌드로 컴파일까지 확인했지만, <b>여러분의 Firebase 프로젝트 설정(콘솔 작업)은 직접 해야 하므로</b> 오늘은 오류 메시지를 읽는 일이 많을 수 있습니다. 섹션 4의 "자주 만나는 오류" 표를 곁에 두세요.</div>
+</section>
+
+<section class="sec" data-sec="concept">
+  <h3>1. Firebase가 해 주는 일</h3>
+  <p>친구의 폰과 내 폰이 데이터를 나누려면 둘 사이에 <b>서버</b>가 있어야 합니다. 서버를 직접 만들려면 또 다른 공부가 한참 필요합니다. Firebase는 구글이 만들어 둔 "빌려 쓰는 서버"입니다.</p>
+  <div class="cards">
+    <div class="card"><div class="ico">🪪</div><b>Authentication</b><p>"이 사람이 누구인지"를 확인하고 사용자마다 고유한 ID(<code>uid</code>)를 준다.</p></div>
+    <div class="card"><div class="ico">🗄️</div><b>Cloud Firestore</b><p>인터넷 위의 데이터베이스. 여러 기기가 같은 데이터를 읽고 쓰고, 바뀌면 실시간으로 알려 준다.</p></div>
+  </div>
+
+  <h3>2. 익명 로그인</h3>
+  <div class="note analogy"><b>비유 — 놀이공원 손목 밴드.</b> 이름을 묻지 않고 입장할 때 번호가 적힌 밴드를 채워 줍니다. 이름은 몰라도 "7번 밴드 손님"으로 구별할 수 있습니다. 익명 로그인도 가입 절차 없이 기기마다 고유한 <code>uid</code>를 발급합니다. 단, 밴드를 잃어버리면(앱 삭제, 기기 변경) 같은 번호를 다시 받을 수 없습니다.</div>
+
+  <h3>3. Firestore의 구조: 컬렉션과 문서</h3>
+  <div class="note analogy"><b>비유 — 서류함.</b> <b>컬렉션</b>은 서랍, <b>문서</b>는 서랍 속 서류 한 장, <b>필드</b>는 서류에 적힌 항목입니다. 서류 한 장에 또 작은 서랍(하위 컬렉션)을 붙일 수 있습니다. 어제의 Room이 "줄과 칸이 정해진 표"였다면, Firestore는 "서류 묶음"입니다.</div>
+  <p>뭉타이머는 이렇게 저장합니다.</p>
+  <script type="text/plain" class="code" data-lang="text" data-title="Firestore 데이터 구조">
+users (컬렉션)
+ └─ {내 uid} (문서) ··············· 내 프로필. 나만 읽고 쓴다
+      ├─ nickname:  "지우"
+      └─ groupCode: "K7M2QX"        ← 내가 속한 그룹
+
+groups (컬렉션)
+ └─ K7M2QX (문서) ················· 그룹. 문서 ID = 초대 코드
+      ├─ name:      "새벽공부방"
+      ├─ ownerUid:  "abc123…"
+      └─ members (하위 컬렉션)
+           ├─ {지우의 uid} (문서) ·· 멤버. 본인만 쓸 수 있고, 그룹 멤버만 읽는다
+           │    ├─ nickname:       "지우"
+           │    ├─ mungCount:      7
+           │    ├─ featuredMungId: 10              ← 대표 뭉
+           │    └─ daily: { "2026-11-09": 5400,    ← 날짜별 공부한 초
+           │                "2026-11-10": 11400 }
+           └─ {민서의 uid} (문서) ·· …
+  </script>
+  <ul>
+    <li><b>초대 코드를 문서 ID로</b> 썼습니다. "코드로 그룹 찾기"가 검색 없이 <code>groups/K7M2QX</code> 문서 하나를 읽는 일이 됩니다.</li>
+    <li><b>랭킹은 서버가 아니라 앱에서 계산</b>합니다. 멤버 문서들을 실시간으로 구독하고, <code>daily</code>에서 오늘(또는 이번 주 7일)의 값을 더해 정렬합니다. Day 2의 <code>sumOf</code>와 <code>sortedByDescending</code>입니다.</li>
+    <li><b>내 기기의 Room이 원본, 서버는 사본</b>입니다. 타이머를 종료할 때와 그룹 화면을 열 때, Room에서 이번 주 날짜별 합계를 구해 내 멤버 문서에 <b>덮어씁니다</b>. "더하기"가 아니라 "덮어쓰기"라서 몇 번을 올려도 값이 틀어지지 않습니다.</li>
+  </ul>
+
+  <h3>4. 서버와 이야기하는 코드: <code>await()</code>와 <code>try / catch</code></h3>
+  <p>서버에 요청하면 답이 오기까지 시간이 걸립니다. Firebase의 요청 뒤에 <code>.await()</code>를 붙이면 "답이 올 때까지 코루틴을 잠깐 멈췄다가, 결과를 받아 다음 줄로" 갑니다. Day 4의 <code>delay</code>, Day 5의 DB 저장과 같은 suspend 함수입니다.</p>
+  <p>또 하나, 네트워크는 <b>실패할 수 있습니다</b>(인터넷 끊김, 권한 없음). 실패하면 <b>예외(Exception)</b>가 "던져지고", 아무도 받지 않으면 앱이 죽습니다. <code>try { } catch { }</code>로 받아서 사용자에게 알려 줍니다.</p>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="예외 처리의 모양">
+try {
+    // 실패할 수 있는 일
+    repository.joinGroup(code, nickname)
+} catch (e: Exception) {
+    // 실패했을 때: e.message 에 이유가 들어 있다
+    showError(e.message)
+} finally {
+    // 성공하든 실패하든 마지막에 꼭 하는 일 (예: 로딩 표시 끄기)
+    hideLoading()
+}
+  </script>
+
+  <h3>5. 실시간 구독</h3>
+  <p>Firestore는 "지금 값을 한 번 읽기"(<code>get()</code>)뿐 아니라 "<b>바뀔 때마다 알려 줘</b>"(<code>snapshots()</code>)를 지원합니다. <code>snapshots()</code>는 어제 배운 <code>Flow</code>를 돌려줍니다. 친구가 공부를 끝내면 내 화면의 랭킹이 저절로 바뀝니다. Room의 <code>Flow</code>와 쓰는 법이 같습니다.</p>
+
+  <h3>6. 보안 규칙: 서버 쪽 문지기</h3>
+  <p>Firestore는 앱에서 직접 접근하므로, 규칙이 없으면 <b>누구나 모든 데이터를 고칠 수 있습니다</b>. Firebase 콘솔에 적는 <b>보안 규칙</b>이 요청마다 "이 사람이 이 문서에 이 일을 해도 되는가"를 검사합니다. 오늘 쓰는 규칙의 뜻은 이렇습니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>대상</th><th>규칙</th></tr>
+    <tr><td><code>users/{uid}</code></td><td>로그인한 본인만 읽고 쓸 수 있다</td></tr>
+    <tr><td><code>groups/{code}</code></td><td>로그인한 사용자는 코드를 알면 그 문서 하나를 읽을 수 있다(목록 조회는 불가). 새로 만들 수만 있고 수정·삭제는 불가</td></tr>
+    <tr><td><code>groups/{code}/members/{uid}</code></td><td>그 그룹의 멤버만 읽을 수 있다. 쓰기는 본인 문서만</td></tr>
+  </table></div>
+  <div class="note honest">이 규칙은 "남의 기록을 고치는 것"은 막지만, <b>자기 공부 시간을 부풀려 올리는 것</b>은 막지 못합니다. 그것까지 막으려면 서버 코드(Cloud Functions)가 필요합니다. 친구끼리 쓰는 앱의 범위로 받아들였습니다.</div>
+</section>
+
+<section class="sec" data-sec="example">
+  <p>예제 1~2는 <a href="https://play.kotlinlang.org" target="_blank" rel="noopener">Kotlin Playground</a>에서 실행합니다. 예제 3~5는 <b>앱에 실제로 들어가는 파일</b>이며, 섹션 4의 Firebase 설정(A~E)을 마친 뒤에 작성해야 빨간 줄이 사라집니다.</p>
+
+  <h3>예제 1. <code>try / catch</code> — 실패할 수 있는 일 다루기</h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex1.kt" data-run="d6_ex1">
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+
+// 서버에 다녀오는 척하는 suspend 함수. 없는 코드면 예외를 "던진다"
+suspend fun findGroupName(code: String): String {
+    delay(300)                                        // 네트워크 왕복 시간 흉내
+    if (code != "K7M2QX") {
+        error("초대 코드에 해당하는 그룹이 없어요")    // error(…) = 예외를 던지는 함수
+    }
+    return "새벽공부방"
+}
+
+suspend fun tryJoin(code: String) {
+    println("[$code] 참여 시도… (로딩 표시 켜기)")
+    try {
+        val name = findGroupName(code)                // 여기서 예외가 나면 아래 줄은 건너뛰고 catch로 간다
+        println("'$name' 그룹에 참여했어요!")
+    } catch (e: Exception) {
+        println("실패: ${e.message}")                 // 앱이 죽지 않고, 이유를 보여 줄 수 있다
+    } finally {
+        println("(로딩 표시 끄기)")                   // 성공/실패와 상관없이 항상 실행
+    }
+}
+
+fun main() = runBlocking {
+    tryJoin("K7M2QX")
+    tryJoin("ABCDEF")
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d6_ex1">
+[K7M2QX] 참여 시도… (로딩 표시 켜기)
+'새벽공부방' 그룹에 참여했어요!
+(로딩 표시 끄기)
+[ABCDEF] 참여 시도… (로딩 표시 켜기)
+실패: 초대 코드에 해당하는 그룹이 없어요
+(로딩 표시 끄기)
+  </script>
+
+  <h3>예제 2. 데이터 모델과 랭킹 계산 <small>(앱 파일 2개 + Playground 확인)</small></h3>
+  <p><code>group</code> 패키지를 만들고 아래 두 파일을 작성합니다. 순수 코틀린이라 Playground에서도 확인할 수 있습니다.</p>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="group/GroupModels.kt" data-path="app/src/main/java/com/example/mungtimer/group/GroupModels.kt">
+package com.example.mungtimer.group
+
+// 그룹 하나. Firestore 문서 groups/{code}
+data class StudyGroup(
+    val code: String,                   // 초대 코드 = 문서 ID
+    val name: String,
+)
+
+// 그룹의 멤버 한 명. Firestore 문서 groups/{code}/members/{uid}
+data class GroupMember(
+    val uid: String,
+    val nickname: String,
+    val featuredMungId: Int,            // 대표 뭉의 id. 정하지 않았으면 -1
+    val mungCount: Int,                 // 모은 뭉 수
+    val daily: Map<String, Long>,       // "2026-11-10" → 그날 공부한 초
+)
+  </script>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="group/GroupRanking.kt" data-path="app/src/main/java/com/example/mungtimer/group/GroupRanking.kt">
+package com.example.mungtimer.group
+
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.temporal.TemporalAdjusters
+
+// 랭킹 기간. label은 화면의 버튼 글자
+enum class RankPeriod(val label: String) {
+    TODAY("오늘"),
+    WEEK("이번 주"),
+}
+
+// 랭킹의 한 줄
+data class RankRow(
+    val rank: Int,
+    val member: GroupMember,
+    val seconds: Long,
+)
+
+// date가 속한 주(월~일)의 날짜 키 7개. 예: ["2026-11-09", …, "2026-11-15"]
+fun weekKeysOf(date: LocalDate): List<String> {
+    val monday = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))   // 그 주의 월요일
+    return (0L..6L).map { monday.plusDays(it).toString() }
+}
+
+// 멤버 목록 → 랭킹. 공부 시간이 많은 순서
+fun buildRanking(
+    members: List<GroupMember>,
+    period: RankPeriod,
+    today: LocalDate = LocalDate.now(),
+): List<RankRow> {
+    // 더해야 할 날짜들: 오늘 하루, 또는 이번 주 7일
+    val keys = when (period) {
+        RankPeriod.TODAY -> listOf(today.toString())
+        RankPeriod.WEEK -> weekKeysOf(today)
+    }
+    val sorted = members
+        .map { member ->
+            val seconds = keys.sumOf { key -> member.daily[key] ?: 0L }   // 기록이 없는 날은 0
+            RankRow(rank = 0, member = member, seconds = seconds)
+        }
+        .sortedByDescending { it.seconds }
+    // 정렬된 순서대로 1위, 2위, … 를 매긴다. mapIndexed는 위치(index)도 함께 주는 map
+    return sorted.mapIndexed { index, row -> row.copy(rank = index + 1) }
+}
+
+// 초 → "3시간 10분" / "45분"
+fun formatDuration(seconds: Long): String {
+    val hours = seconds / 3600
+    val minutes = (seconds % 3600) / 60
+    return if (hours > 0) "${hours}시간 ${minutes}분" else "${minutes}분"
+}
+  </script>
+  <p><b>Playground에서 확인하기:</b> 위 두 파일의 내용을 <code>package</code> 줄만 빼고 붙여 넣고(<code>import</code> 세 줄은 맨 위로), 아래 <code>main</code>을 추가합니다.</p>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="확인용 main" data-run="d6_ex2" data-run-include="app/src/main/java/com/example/mungtimer/group/GroupModels.kt,app/src/main/java/com/example/mungtimer/group/GroupRanking.kt">
+fun main() {
+    val today = LocalDate.of(2026, 11, 11)                      // 수요일이라고 가정
+    println(weekKeysOf(today))
+
+    val members = listOf(
+        GroupMember("u1", "지우", 10, 7, mapOf("2026-11-09" to 5400L, "2026-11-11" to 1800L)),
+        GroupMember("u2", "민서", -1, 2, mapOf("2026-11-11" to 2700L)),
+        GroupMember("u3", "하준", 6, 4, mapOf("2026-11-08" to 9000L)),      // 지난주 일요일 기록뿐
+    )
+
+    println("[오늘]")
+    for (row in buildRanking(members, RankPeriod.TODAY, today)) {
+        println("${row.rank}위 ${row.member.nickname} ${formatDuration(row.seconds)}")
+    }
+
+    println("[이번 주]")
+    for (row in buildRanking(members, RankPeriod.WEEK, today)) {
+        println("${row.rank}위 ${row.member.nickname} ${formatDuration(row.seconds)}")
+    }
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d6_ex2">
+[2026-11-09, 2026-11-10, 2026-11-11, 2026-11-12, 2026-11-13, 2026-11-14, 2026-11-15]
+[오늘]
+1위 민서 45분
+2위 지우 30분
+3위 하준 0분
+[이번 주]
+1위 지우 2시간 0분
+2위 민서 45분
+3위 하준 0분
+  </script>
+
+  <h3>예제 3. 기기에만 두는 설정 — 대표 뭉</h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="data/LocalPrefs.kt" data-path="app/src/main/java/com/example/mungtimer/data/LocalPrefs.kt">
+package com.example.mungtimer.data
+
+import android.content.Context
+import androidx.core.content.edit
+
+// "대표 뭉을 아직 정하지 않았다"를 뜻하는 값
+const val NO_FEATURED_MUNG = -1
+
+// 기기에 저장하는 작은 설정 (Day 4의 SharedPreferences)
+class LocalPrefs(context: Context) {
+
+    private val prefs = context.getSharedPreferences("profile", Context.MODE_PRIVATE)
+
+    // 내가 고른 대표 뭉의 id
+    fun featuredMungId(): Int = prefs.getInt("featuredMungId", NO_FEATURED_MUNG)
+
+    fun setFeaturedMungId(mungId: Int) {
+        prefs.edit { putInt("featuredMungId", mungId) }
+    }
+}
+  </script>
+
+  <h3>예제 4. Repository — Firebase와 이야기하는 코드를 한 곳에</h3>
+  <p>ViewModel이 Firebase를 직접 다루면 금방 복잡해집니다. "서버와 주고받는 일"만 모아 둔 클래스를 <b>Repository(저장소)</b>라고 부릅니다. 오늘 가장 중요한 파일이니 주석을 따라 천천히 읽어 보세요.</p>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="group/GroupRepository.kt" data-path="app/src/main/java/com/example/mungtimer/group/GroupRepository.kt">
+package com.example.mungtimer.group
+
+import android.content.Context
+import android.util.Log
+import com.example.mungtimer.data.AppDatabase
+import com.example.mungtimer.data.LocalPrefs
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
+import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.firestore
+import com.google.firebase.firestore.snapshots
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.tasks.await
+import java.time.LocalDate
+
+class GroupRepository(context: Context) {
+
+    private val auth = Firebase.auth                    // 로그인 담당
+    private val firestore = Firebase.firestore          // 데이터베이스 담당
+    private val database = AppDatabase.getInstance(context)
+    private val localPrefs = LocalPrefs(context)
+
+    // ── 문서의 "주소" 만들기 ──────────────────────────────────────────────
+    private fun userRef(uid: String): DocumentReference =
+        firestore.collection("users").document(uid)                 // users/{uid}
+
+    private fun groupRef(code: String): DocumentReference =
+        firestore.collection("groups").document(code)               // groups/{code}
+
+    private fun memberRef(code: String, uid: String): DocumentReference =
+        groupRef(code).collection("members").document(uid)          // groups/{code}/members/{uid}
+
+    // ── 로그인 ──────────────────────────────────────────────────────────
+    // 이미 로그인돼 있으면 그 uid를, 아니면 익명으로 로그인한 뒤 uid를 돌려준다
+    suspend fun ensureSignedIn(): String {
+        val current = auth.currentUser
+        if (current != null) return current.uid
+
+        val result = auth.signInAnonymously().await()   // await: 서버의 답이 올 때까지 기다린다
+        return result.user?.uid ?: error("로그인에 실패했어요")
+    }
+
+    // ── 읽기 ────────────────────────────────────────────────────────────
+    // 내가 속한 그룹의 코드. 아직 없으면 null
+    suspend fun myGroupCode(): String? {
+        val uid = ensureSignedIn()
+        val snapshot = userRef(uid).get().await()       // 문서 한 장을 한 번 읽기
+        return snapshot.getString("groupCode")          // 문서나 필드가 없으면 null
+    }
+
+    // 코드로 그룹 찾기. 없으면 null
+    suspend fun findGroup(code: String): StudyGroup? {
+        val snapshot = groupRef(code).get().await()
+        if (!snapshot.exists()) return null
+        return StudyGroup(code = code, name = snapshot.getString("name") ?: "")
+    }
+
+    // 그룹의 멤버 목록을 실시간으로 구독. 누군가의 문서가 바뀔 때마다 새 목록이 흘러나온다
+    fun observeMembers(code: String): Flow<List<GroupMember>> =
+        groupRef(code).collection("members")
+            .snapshots()
+            .map { querySnapshot -> querySnapshot.documents.map { memberFrom(it) } }
+
+    // Firestore 문서 한 장 → GroupMember. 필드가 비어 있어도 죽지 않도록 기본값을 준다
+    private fun memberFrom(snapshot: DocumentSnapshot): GroupMember {
+        // daily는 { "2026-11-10": 3600, … } 모양의 Map. 숫자는 Long으로 꺼낸다
+        val rawDaily = snapshot.get("daily") as? Map<*, *> ?: emptyMap<Any, Any>()
+        val daily = rawDaily.entries.associate { entry ->
+            entry.key.toString() to ((entry.value as? Number)?.toLong() ?: 0L)
+        }
+        return GroupMember(
+            uid = snapshot.id,                                          // 문서 ID = uid
+            nickname = snapshot.getString("nickname") ?: "이름 없는 뭉",
+            featuredMungId = (snapshot.getLong("featuredMungId") ?: -1L).toInt(),
+            mungCount = (snapshot.getLong("mungCount") ?: 0L).toInt(),
+            daily = daily,
+        )
+    }
+
+    // ── 쓰기 ────────────────────────────────────────────────────────────
+    // 새 그룹을 만들고 초대 코드를 돌려준다
+    suspend fun createGroup(groupName: String, nickname: String): String {
+        val uid = ensureSignedIn()
+
+        // 아직 아무도 쓰지 않는 코드가 나올 때까지 뽑는다
+        var code = newInviteCode()
+        while (groupRef(code).get().await().exists()) {
+            code = newInviteCode()
+        }
+
+        // set(지도): 문서를 만든다. mapOf("필드 이름" to 값, …)
+        groupRef(code).set(
+            mapOf(
+                "name" to groupName,
+                "ownerUid" to uid,
+                "createdAt" to FieldValue.serverTimestamp(),    // 서버의 현재 시각
+            )
+        ).await()
+
+        saveMembership(uid, code, nickname)
+        return code
+    }
+
+    // 초대 코드로 그룹에 참여한다
+    suspend fun joinGroup(code: String, nickname: String) {
+        val uid = ensureSignedIn()
+        if (findGroup(code) == null) error("초대 코드에 해당하는 그룹이 없어요")
+        saveMembership(uid, code, nickname)
+    }
+
+    // 멤버 문서와 내 프로필을 저장한다 (만들기와 참여의 공통 부분)
+    private suspend fun saveMembership(uid: String, code: String, nickname: String) {
+        // SetOptions.merge(): 문서 전체를 갈아 끼우지 않고, 적은 필드만 덮어쓴다
+        memberRef(code, uid).set(mapOf("nickname" to nickname), SetOptions.merge()).await()
+        userRef(uid).set(mapOf("groupCode" to code, "nickname" to nickname)).await()
+        syncMyStats()                                   // 지금까지의 기록을 바로 올린다
+    }
+
+    // 내 기기(Room)의 기록을 그룹의 내 문서에 올린다
+    suspend fun syncMyStats() {
+        val uid = auth.currentUser?.uid ?: return       // 로그인한 적이 없으면(그룹 화면을 연 적이 없으면) 할 일이 없다
+        val code = myGroupCode() ?: return              // 그룹이 없어도 할 일이 없다
+
+        // 이번 주 월요일부터의 날짜별 합계 → Map<날짜, 초>
+        val monday = weekKeysOf(LocalDate.now()).first()
+        val daily = database.studyDao().dailyTotalsSince(monday)
+            .associate { total -> total.dateKey to total.seconds }
+
+        memberRef(code, uid).set(
+            mapOf(
+                "daily" to daily,
+                "mungCount" to database.mungDao().count(),
+                "featuredMungId" to localPrefs.featuredMungId(),
+            ),
+            SetOptions.merge(),     // daily 안의 다른 날짜, nickname 등 나머지 필드는 그대로 둔다
+        ).await()
+    }
+
+    // 실패해도 예외를 던지지 않는 버전. "되면 좋고, 안 되면 다음 기회에" 올릴 때 쓴다
+    suspend fun syncMyStatsQuietly() {
+        try {
+            syncMyStats()
+        } catch (e: CancellationException) {
+            throw e                                     // 코루틴 취소는 오류가 아니므로 그대로 전달한다
+        } catch (e: Exception) {
+            Log.w("MungTimer", "그룹 동기화 실패: ${e.message}")
+        }
+    }
+
+    // 그룹에서 나간다
+    suspend fun leaveGroup() {
+        val uid = ensureSignedIn()
+        val code = myGroupCode() ?: return
+        memberRef(code, uid).delete().await()
+        userRef(uid).delete().await()
+    }
+
+    // 6글자 초대 코드. 헷갈리는 글자(0과 O, 1과 I)는 뺐다
+    private fun newInviteCode(): String {
+        val letters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        return (1..6).map { letters.random() }.joinToString("")
+    }
+}
+  </script>
+  <div class="note"><b>읽는 요령.</b> 모든 함수가 같은 리듬입니다. ① <code>ensureSignedIn()</code>으로 내 uid를 얻고 ② 문서의 주소(<code>…Ref</code>)를 만들고 ③ <code>get()</code> / <code>set()</code> / <code>delete()</code> 뒤에 <code>.await()</code>. <code>as? Map&lt;*, *&gt;</code>는 "Map이면 Map으로, 아니면 null"이라는 안전한 형 변환입니다.</div>
+</section>
+
+<section class="sec" data-sec="studio">
+  <p>코드보다 <b>설정이 먼저</b>입니다. A → E 순서대로 진행하세요. Firebase 콘솔은 메뉴 배치가 자주 바뀝니다. 이름이 조금 달라도 같은 뜻의 메뉴를 고르면 되고, 못 찾겠으면 콘솔 위쪽의 검색을 쓰세요.</p>
+
+  <h3>A. Firebase 프로젝트 만들기</h3>
+  <ol class="steps">
+    <li><a href="https://console.firebase.google.com" target="_blank" rel="noopener">console.firebase.google.com</a>에 구글 계정으로 로그인하고 <b>프로젝트 만들기</b>(Create a project)를 누릅니다.</li>
+    <li>프로젝트 이름에 <code>mung-timer</code>를 입력하고 계속.</li>
+    <li>"Gemini in Firebase"와 <b>Google 애널리틱스</b>는 오늘 필요 없으니 <b>사용 안 함</b>으로 두고 <b>프로젝트 만들기</b>.</li>
+  </ol>
+
+  <h3>B. 안드로이드 앱 등록하고 <code>google-services.json</code> 넣기</h3>
+  <ol class="steps">
+    <li>프로젝트 개요 화면 가운데의 <b>안드로이드 아이콘</b>(또는 <b>앱 추가</b>)을 누릅니다.</li>
+    <li><b>Android 패키지 이름</b>에 <code>com.example.mungtimer</code>를 입력합니다. 내 앱의 값은 <code>app/build.gradle.kts</code>의 <code>applicationId</code>에 있습니다. <b>한 글자라도 다르면 연결되지 않습니다.</b> 닉네임과 SHA-1은 비워 두고 <b>앱 등록</b>.</li>
+    <li><b>google-services.json 다운로드</b>를 누릅니다.</li>
+    <li>안드로이드 스튜디오의 Project 창 위쪽 드롭다운을 <b>Android → Project</b>로 바꾸고, 내려받은 파일을 <b><code>MungTimer/app/</code> 폴더</b>(<code>build.gradle.kts</code>와 <code>src</code>가 보이는 곳)에 끌어다 놓습니다. 확인 후 드롭다운을 다시 <b>Android</b>로 돌려놓습니다.</li>
+    <li>콘솔의 나머지 단계(SDK 추가 안내)는 <b>다음</b>을 눌러 넘어갑니다. 아래 C에서 직접 합니다.</li>
+  </ol>
+  <div class="note warn">파일 이름이 정확히 <code>google-services.json</code>이어야 합니다. 여러 번 받아서 <code>google-services (1).json</code>이 되었다면 이름을 고치세요. 이 파일에는 비밀번호 같은 비밀 값은 없지만, 내 Firebase 프로젝트의 주소가 들어 있습니다.</div>
+
+  <h3>C. Gradle에 Firebase 추가하기</h3>
+  <ol class="steps">
+    <li><span class="menu-path">build.gradle.kts (Project: MungTimer)</span>의 <code>plugins { }</code>에 한 줄 추가:
+      <script type="text/plain" class="code" data-lang="kts" data-title="build.gradle.kts (Project: MungTimer)" data-hl="5-6">
+plugins {
+    // … 기존 줄들 …
+    id("com.google.devtools.ksp") version "2.3.13" apply false
+
+    // Day 6: google-services.json을 읽어 주는 플러그인
+    id("com.google.gms.google-services") version "4.5.0" apply false
+}
+      </script>
+    </li>
+    <li><span class="menu-path">build.gradle.kts (Module :app)</span>의 두 군데에 추가:
+      <script type="text/plain" class="code" data-lang="kts" data-title="app/build.gradle.kts" data-hl="5-6,14-18">
+plugins {
+    // … 기존 줄들 …
+    id("com.google.devtools.ksp")
+
+    // Day 6
+    id("com.google.gms.google-services")
+}
+
+// … android { } 블록은 그대로 …
+
+dependencies {
+    // … 기존 줄들과 Day 4, Day 5에 추가한 줄들 …
+
+    // Day 6: Firebase
+    implementation(platform("com.google.firebase:firebase-bom:35.1.0"))   // 버전 묶음표: 아래 두 줄의 버전을 알아서 맞춰 준다
+    implementation("com.google.firebase:firebase-auth")                   // 로그인
+    implementation("com.google.firebase:firebase-firestore")              // 데이터베이스
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")   // .await()
+}
+      </script>
+    </li>
+    <li><b>Sync Now</b>. 인터넷 권한(<code>INTERNET</code>)은 Firebase 라이브러리가 자동으로 추가하므로 <code>AndroidManifest.xml</code>은 고치지 않아도 됩니다.</li>
+  </ol>
+
+  <h3>D. 익명 로그인 켜기</h3>
+  <ol class="steps">
+    <li>Firebase 콘솔 왼쪽 메뉴에서 <b>Authentication</b>을 엽니다(메뉴 묶음 이름은 <b>Security</b> 또는 <b>빌드</b>). <b>시작하기</b>를 누릅니다.</li>
+    <li><b>로그인 방법</b>(Sign-in method) 탭 → <b>익명</b>(Anonymous) → <b>사용 설정</b> 스위치를 켜고 <b>저장</b>.</li>
+  </ol>
+
+  <h3>E. Firestore 만들고 보안 규칙 넣기</h3>
+  <ol class="steps">
+    <li>왼쪽 메뉴에서 <b>Firestore</b>(묶음 이름은 <b>Databases &amp; Storage</b> 또는 <b>빌드</b>)를 열고 <b>데이터베이스 만들기</b>.</li>
+    <li>위치는 <b>asia-northeast3 (Seoul)</b>을 고릅니다. 나중에 바꿀 수 없습니다.</li>
+    <li>보안 규칙은 <b>프로덕션 모드</b>로 시작을 고르고 <b>만들기</b>. (테스트 모드는 30일 동안 누구나 읽고 쓸 수 있는 규칙이라 권하지 않습니다.)</li>
+    <li>만들어지면 위쪽 <b>규칙</b>(Rules) 탭을 열고, 내용을 모두 지운 뒤 아래 규칙을 붙여 넣고 <b>게시</b>(Publish).</li>
+  </ol>
+  <script type="text/plain" class="code" data-lang="rules" data-title="Firestore 보안 규칙">
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 내 프로필: 로그인한 본인만 읽고 쓸 수 있다
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /groups/{code} {
+      // 로그인한 사용자는 코드를 알면 그 그룹 문서 하나를 읽을 수 있다 (전체 목록 조회는 불가)
+      allow get: if request.auth != null;
+      // 새 그룹 만들기만 허용한다. 수정과 삭제는 불가
+      allow create: if request.auth != null;
+
+      match /members/{uid} {
+        // 멤버 목록은 그 그룹의 멤버만 읽을 수 있다
+        allow read: if request.auth != null
+          && exists(/databases/$(database)/documents/groups/$(code)/members/$(request.auth.uid));
+        // 멤버 문서는 본인 것만 만들고, 고치고, 지울 수 있다
+        allow write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+  }
+}
+  </script>
+
+  <h3>F. 기기가 한 대뿐일 때: 콘솔에서 가짜 멤버 넣기</h3>
+  <ol class="steps">
+    <li>앱에서 그룹을 만든 뒤, 콘솔의 Firestore <b>데이터</b> 탭에서 <span class="menu-path">groups → (내 초대 코드) → members</span>를 엽니다. 내 문서가 보입니다.</li>
+    <li><b>문서 추가</b> → 문서 ID에 <code>fake-minseo</code> → 필드 추가: <code>nickname</code>(string) = <code>민서</code>, <code>mungCount</code>(number) = <code>3</code>, <code>featuredMungId</code>(number) = <code>6</code>, <code>daily</code>(map) 안에 오늘 날짜(예: <code>2026-11-10</code>, number) = <code>5400</code>.</li>
+    <li>저장하는 순간 앱의 랭킹에 "민서 · 1시간 30분"이 나타납니다. 실시간 구독이 동작하는 것입니다. (콘솔은 관리자 권한이라 보안 규칙을 건너뜁니다.)</li>
+  </ol>
+
+  <h3>자주 만나는 오류</h3>
+  <div class="table-wrap"><table>
+    <tr><th>오류 메시지 (Build 창 / Logcat / 앱 화면)</th><th>원인과 해결</th></tr>
+    <tr><td><code>File google-services.json is missing</code></td><td>파일 위치가 틀렸습니다. <code>app/</code> 폴더 바로 아래에 있어야 합니다(B-4).</td></tr>
+    <tr><td><code>No matching client found for package name</code></td><td>콘솔에 등록한 패키지 이름과 <code>applicationId</code>가 다릅니다. 콘솔의 프로젝트 설정에서 맞는 이름으로 앱을 다시 추가하고 json을 새로 받으세요.</td></tr>
+    <tr><td><code>PERMISSION_DENIED: Missing or insufficient permissions</code></td><td>보안 규칙에 막혔습니다. 규칙을 그대로 붙여 넣고 <b>게시</b>했는지(E-4), 익명 로그인을 켰는지(D) 확인하세요.</td></tr>
+    <tr><td>로그인 실패, <code>ADMIN_ONLY_OPERATION</code> 또는 <code>sign-in provider is disabled</code></td><td>익명 로그인이 꺼져 있습니다(D).</td></tr>
+    <tr><td>로딩 표시가 끝없이 돈다</td><td>기기가 인터넷에 연결되지 않았습니다. Firestore의 쓰기는 연결될 때까지 기다립니다. 에뮬레이터의 Wi-Fi를 확인하세요.</td></tr>
+    <tr><td>에뮬레이터에서만 로그인이 안 된다</td><td>Google Play 서비스가 없는 시스템 이미지입니다. Day 3의 안내대로 <b>Play Store 아이콘이 있는 기기</b>로 새로 만드세요.</td></tr>
+  </table></div>
+  <div class="note">Logcat 검색 칸에 <code>package:mine level:warn</code>을 넣으면 Firebase가 남기는 경고와 우리가 <code>Log.w("MungTimer", …)</code>로 남긴 기록을 함께 볼 수 있습니다.</div>
+</section>
+
+<section class="sec" data-sec="quiz">
+  <div class="q" data-type="mc" data-answer="3">
+    <p class="q-title">Firestore의 구조에 대한 설명으로 알맞은 것은?</p>
+    <ul class="q-options">
+      <li>표(table)와 줄(row)로 이루어져 있고 SQL로 질문한다</li>
+      <li>문서 안에 컬렉션이 있고, 컬렉션 안에 필드가 있다</li>
+      <li>컬렉션 안에 문서가 있고, 문서 안에 필드가 있다. 문서는 하위 컬렉션을 가질 수 있다</li>
+      <li>파일 하나에 모든 데이터를 JSON으로 저장한다</li>
+    </ul>
+    <div class="q-explain"><p>서랍(컬렉션) → 서류(문서) → 항목(필드)입니다. <code>groups/K7M2QX/members/{uid}</code>는 "groups 서랍의 K7M2QX 서류에 붙은 members 서랍의 {uid} 서류"입니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="await">
+    <p class="q-title">서버의 답이 올 때까지 코루틴을 멈췄다가 결과를 받으려고 합니다. 빈칸은?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+val result = auth.signInAnonymously().____()
+val uid = result.user?.uid
+    </script>
+    <div class="q-explain"><p><code>await()</code>입니다. Firebase의 요청(Task)을 suspend 방식으로 기다리게 해 주며, <code>kotlinx-coroutines-play-services</code> 라이브러리가 제공합니다. 실패하면 예외를 던집니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="2">
+    <p class="q-title">익명 로그인에 대한 설명으로 <b>틀린</b> 것은?</p>
+    <ul class="q-options">
+      <li>가입 화면 없이 사용자마다 고유한 uid를 받을 수 있다</li>
+      <li>앱을 삭제했다 다시 설치해도 항상 같은 uid를 받는다</li>
+      <li>보안 규칙에서 <code>request.auth.uid</code>로 본인인지 확인할 수 있다</li>
+      <li>Firebase 콘솔에서 익명 로그인을 켜 두어야 동작한다</li>
+    </ul>
+    <div class="q-explain"><p>앱을 삭제하면 기기에 저장된 로그인 정보가 사라져, 다시 설치하면 <b>새 uid</b>를 받습니다. 그룹 소속도 새로 시작됩니다. 이를 막으려면 익명 계정을 이메일/구글 계정에 "연결"해야 합니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="4">
+    <p class="q-title"><code>google-services.json</code> 파일을 넣어야 하는 위치는?</p>
+    <ul class="q-options">
+      <li>프로젝트 최상위 폴더 (<code>MungTimer/</code>)</li>
+      <li><code>app/src/main/java/</code></li>
+      <li><code>app/src/main/res/</code></li>
+      <li>앱 모듈 폴더 (<code>MungTimer/app/</code>)</li>
+    </ul>
+    <div class="q-explain"><p><code>app/build.gradle.kts</code>와 같은 폴더입니다. 다른 곳에 두면 빌드할 때 "google-services.json is missing" 오류가 납니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="merge">
+    <p class="q-title">문서의 다른 필드는 그대로 두고 <code>mungCount</code>만 덮어쓰려고 합니다. 빈칸은?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+memberRef(code, uid)
+    .set(mapOf("mungCount" to 8), SetOptions.____())
+    .await()
+    </script>
+    <div class="q-explain"><p><code>SetOptions.merge()</code>가 없으면 문서 전체가 <code>{ mungCount: 8 }</code>로 교체되어 닉네임과 공부 기록이 사라집니다. <code>merge()</code>를 주면 적은 필드만 합쳐집니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="1">
+    <p class="q-title">보안 규칙 <code>allow write: if request.auth != null &amp;&amp; request.auth.uid == uid;</code>의 뜻은?</p>
+    <ul class="q-options">
+      <li>로그인했고, 문서 ID(uid)가 요청한 사람의 uid와 같을 때만 쓸 수 있다</li>
+      <li>로그인한 사람이면 누구의 문서든 쓸 수 있다</li>
+      <li>아무도 쓸 수 없다</li>
+      <li>앱에서 이 조건을 직접 검사해야 한다</li>
+    </ul>
+    <div class="q-explain"><p>규칙은 <b>서버에서</b> 검사됩니다. 앱 코드를 고쳐서 남의 문서에 쓰려고 해도 서버가 <code>PERMISSION_DENIED</code>로 거절합니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="catch">
+    <p class="q-title">참여에 실패해도 앱이 죽지 않고 오류 문구를 보여 주려고 합니다. 빈칸은?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+try {
+    repository.joinGroup(code, nickname)
+} ____ (e: Exception) {
+    _uiState.update { it.copy(errorMessage = e.message) }
+}
+    </script>
+    <div class="q-explain"><p><code>try</code> 안에서 예외가 던져지면 <code>catch</code> 블록이 받습니다. 받지 않은 예외는 앱을 종료시킵니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="3">
+    <p class="q-title">오늘이 2026-11-11(수)일 때, 아래 멤버의 <b>이번 주</b> 공부 시간은?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+val daily = mapOf(
+    "2026-11-08" to 3600L,   // 일요일
+    "2026-11-09" to 1800L,   // 월요일
+    "2026-11-11" to 2400L,   // 수요일
+)
+    </script>
+    <ul class="q-options">
+      <li>40분</li>
+      <li>130분</li>
+      <li>70분</li>
+      <li>100분</li>
+    </ul>
+    <div class="q-explain"><p>이번 주는 월요일(11-09)부터 일요일(11-15)까지입니다. 11-08은 지난주라 빠지고, 1800 + 2400 = 4200초 = 70분입니다. <code>weekKeysOf(today).sumOf { daily[it] ?: 0L }</code>가 하는 일입니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="2">
+    <p class="q-title">멤버 목록을 <code>get()</code>으로 한 번 읽는 대신 <code>snapshots()</code>(Flow)로 구독하면 좋은 점은?</p>
+    <ul class="q-options">
+      <li>인터넷 없이도 친구의 최신 기록을 받을 수 있다</li>
+      <li>친구의 문서가 바뀔 때마다 새 목록이 흘러와, 새로고침 없이 랭킹이 갱신된다</li>
+      <li>보안 규칙을 통과하지 않아도 읽을 수 있다</li>
+      <li>읽는 횟수가 과금되지 않는다</li>
+    </ul>
+    <div class="q-explain"><p>Room의 <code>Flow</code>와 같은 원리입니다. ViewModel에서 <code>collect</code>해 <code>uiState</code>에 넣어 두면 화면은 알아서 따라옵니다.</p></div>
+  </div>
+</section>
+
+<section class="sec" data-sec="task">
+  <h3>과제: 그룹 화면 만들고 전부 연결하기</h3>
+  <p>섹션 4의 설정(A~E)과 예제 2~4의 파일 4개(<code>GroupModels</code>, <code>GroupRanking</code>, <code>LocalPrefs</code>, <code>GroupRepository</code>)가 준비되어 있어야 합니다.</p>
+  <div class="phones">
+    <div class="phone" aria-label="그룹이 없을 때 화면 예시">
+      <b>그룹</b>
+      <div style="text-align:left;font-size:.76rem;margin-top:8px;display:grid;gap:6px">
+        <div style="border:1px solid #F2DCCF;border-radius:8px;padding:5px 8px">닉네임</div>
+        <div style="border:1px solid #F2DCCF;border-radius:8px;padding:5px 8px">그룹 이름</div>
+        <span class="pbtn" style="text-align:center">그룹 만들기</span>
+        <div style="border:1px solid #F2DCCF;border-radius:8px;padding:5px 8px">초대 코드 6글자</div>
+        <span class="pbtn alt" style="text-align:center">참여하기</span>
+      </div>
+    </div>
+    <div class="phone" aria-label="그룹 랭킹 화면 예시">
+      <b>새벽공부방</b>
+      <div style="font-size:.74rem">초대 코드 K7M2QX · 초대하기</div>
+      <div class="row"><span class="pbtn">오늘</span><span class="pbtn alt">이번 주</span></div>
+      <div style="text-align:left;margin-top:10px;font-size:.78rem;display:grid;gap:5px">
+        <div>🥇 🔥 지우 · 3시간 10분</div>
+        <div>🥈 🍓 나 · 2시간 5분</div>
+        <div>🥉 🥚 민서 · 45분</div>
+      </div>
+      <div class="tabs"><span>⏱️ 타이머</span><span>📖 도감</span><b>👥 그룹</b></div>
+    </div>
+  </div>
+
+  <h4>요구사항 체크리스트</h4>
+  <ul class="checklist">
+    <li>Firebase 설정 A~E를 마쳤고, 앱이 오류 없이 빌드된다</li>
+    <li><code>group/GroupViewModel.kt</code> — <code>GroupUiState(isFirstLoad, isLoading, myUid, group, members, period, errorMessage)</code>를 공개하고, 시작할 때 익명 로그인 후 내 그룹을 불러온다</li>
+    <li><code>createGroup</code> · <code>joinGroup</code> · <code>leaveGroup</code> · <code>selectPeriod</code>를 구현했다. 서버 작업은 공통 함수에서 <code>try / catch / finally</code>로 감싸 로딩과 오류 문구를 관리한다</li>
+    <li>그룹이 있으면 <code>observeMembers()</code>를 구독해 <code>members</code>를 실시간으로 갱신한다</li>
+    <li><code>group/GroupScreen.kt</code> — 그룹이 없으면 닉네임 · 그룹 이름 · 초대 코드 입력 폼, 있으면 그룹 이름 · 초대 코드 · [초대하기](공유) · 오늘/이번 주 선택 · 랭킹 목록 · [그룹 나가기]</li>
+    <li>랭킹의 각 줄에 순위, <b>대표 뭉 이모지</b>, 닉네임(나는 "(나)" 표시), 뭉 수, 공부 시간을 보여 준다</li>
+    <li>도감의 상세 창에 <b>[대표 뭉으로 설정]</b> 버튼을 추가하고, 누르면 기기에 저장한 뒤 그룹에 올린다</li>
+    <li><code>TimerViewModel.finish()</code>의 마지막에 그룹 동기화(<code>syncMyStatsQuietly()</code>)를 추가했다</li>
+    <li><code>MainActivity</code>에 세 번째 탭 "그룹"을 추가했다</li>
+    <li>시험 통과: 그룹 만들기 → 콘솔에 문서가 생긴다 → 가짜 멤버(F) 또는 두 번째 기기로 참여 → 랭킹이 실시간으로 바뀐다 → 공부를 종료하면 내 시간이 올라간다</li>
+  </ul>
+
+  <details class="hint"><summary>힌트 1 — 공통 처리 함수</summary>
+    <p><code>private fun runTask(task: suspend () -&gt; Unit)</code>을 만들어 <code>viewModelScope.launch { 로딩 켜기; try { task() } catch (e: Exception) { 오류 문구 저장 } finally { 로딩 끄기 } }</code>로 감쌉니다. <code>suspend () -&gt; Unit</code>은 "suspend 함수를 부를 수 있는 람다" 타입입니다. 그러면 <code>fun joinGroup(…) { runTask { repository.joinGroup(…); loadMyGroup() } }</code>처럼 짧게 쓸 수 있습니다.</p>
+  </details>
+  <details class="hint"><summary>힌트 2 — 내 그룹 불러오기와 구독</summary>
+    <p><code>loadMyGroup()</code>: <code>ensureSignedIn()</code> → <code>myGroupCode()</code> → 코드가 있으면 <code>findGroup(code)</code> → <code>uiState</code>에 반영 → 그룹이 있으면 <code>membersJob = viewModelScope.launch { repository.observeMembers(code).catch { … }.collect { members -&gt; … } }</code>. 다시 부를 때 구독이 두 개가 되지 않도록 먼저 <code>membersJob?.cancel()</code>을 합니다. 구독 중의 오류는 <code>.catch { }</code>로 받아야 앱이 죽지 않습니다.</p>
+  </details>
+  <details class="hint"><summary>힌트 3 — 입력 칸</summary>
+    <p><code>var nickname by rememberSaveable { mutableStateOf("") }</code>와 <code>OutlinedTextField(value = nickname, onValueChange = { nickname = it }, label = { Text("닉네임") }, singleLine = true)</code>. 입력 칸도 "상태를 받아 그리고, 바뀌면 알린다"는 같은 원리입니다. 초대 코드는 <code>onValueChange = { inviteCode = it.uppercase().take(6) }</code>로 대문자 6글자까지만 받습니다.</p>
+  </details>
+  <details class="hint"><summary>힌트 4 — 공유 창 띄우기</summary>
+    <p><code>val context = LocalContext.current</code> 다음, 버튼의 <code>onClick</code>에서 <code>val intent = Intent(Intent.ACTION_SEND)</code> → <code>intent.type = "text/plain"</code> → <code>intent.putExtra(Intent.EXTRA_TEXT, "초대 코드: …")</code> → <code>context.startActivity(Intent.createChooser(intent, "초대 코드 보내기"))</code>. 카카오톡, 메시지 등 설치된 앱 목록이 뜹니다.</p>
+  </details>
+  <details class="hint"><summary>힌트 5 — 대표 뭉을 도감 상태에 합치기</summary>
+    <p>대표 뭉 id를 <code>MutableStateFlow(localPrefs.featuredMungId())</code>에 담고, <code>combine(mungDao.observeAll(), featuredMungId) { owned, featuredId -&gt; buildUiState(owned, featuredId) }</code>로 두 Flow를 합칩니다. <code>combine</code>은 둘 중 하나라도 바뀌면 최신 값 두 개로 다시 계산합니다.</p>
+  </details>
+
+  <details class="answer"><summary>모범 답안 보기</summary>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="group/GroupViewModel.kt" data-path="app/src/main/java/com/example/mungtimer/group/GroupViewModel.kt">
+package com.example.mungtimer.group
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+data class GroupUiState(
+    val isFirstLoad: Boolean = true,                // 앱을 켜고 처음 불러오는 중인가
+    val isLoading: Boolean = true,                  // 서버 작업 중인가
+    val myUid: String = "",
+    val group: StudyGroup? = null,                  // null이면 아직 그룹이 없다
+    val members: List<GroupMember> = emptyList(),
+    val period: RankPeriod = RankPeriod.TODAY,
+    val errorMessage: String? = null,
+)
+
+class GroupViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository = GroupRepository(application)
+
+    private val _uiState = MutableStateFlow(GroupUiState())
+    val uiState: StateFlow<GroupUiState> = _uiState.asStateFlow()
+
+    private var membersJob: Job? = null             // 멤버 실시간 구독의 리모컨
+
+    init {
+        refresh()
+    }
+
+    // 로그인하고 내 그룹을 불러온다
+    fun refresh() {
+        runTask { loadMyGroup() }
+    }
+
+    fun createGroup(groupName: String, nickname: String) {
+        runTask {
+            if (groupName.isBlank() || nickname.isBlank()) error("닉네임과 그룹 이름을 입력해 주세요")
+            repository.createGroup(groupName.trim(), nickname.trim())
+            loadMyGroup()
+        }
+    }
+
+    fun joinGroup(code: String, nickname: String) {
+        runTask {
+            if (code.isBlank() || nickname.isBlank()) error("닉네임과 초대 코드를 입력해 주세요")
+            repository.joinGroup(code.trim().uppercase(), nickname.trim())
+            loadMyGroup()
+        }
+    }
+
+    fun leaveGroup() {
+        runTask {
+            membersJob?.cancel()                    // 나가기 전에 구독부터 끊는다 (나간 뒤에는 읽을 권한이 없다)
+            repository.leaveGroup()
+            loadMyGroup()
+        }
+    }
+
+    fun selectPeriod(period: RankPeriod) {
+        _uiState.update { it.copy(period = period) }
+    }
+
+    private suspend fun loadMyGroup() {
+        val uid = repository.ensureSignedIn()
+        val code = repository.myGroupCode()
+        val group = if (code == null) null else repository.findGroup(code)
+        _uiState.update {
+            it.copy(myUid = uid, group = group, members = if (group == null) emptyList() else it.members)
+        }
+
+        membersJob?.cancel()                        // 구독이 겹치지 않게 이전 것은 끊는다
+        if (group != null) {
+            membersJob = viewModelScope.launch {
+                repository.observeMembers(group.code)
+                    .catch { e -> _uiState.update { it.copy(errorMessage = e.message) } }   // 구독 중 오류
+                    .collect { members -> _uiState.update { it.copy(members = members) } }
+            }
+            // 내 최신 기록 올리기. 결과를 기다리지 않도록 따로 launch
+            viewModelScope.launch { repository.syncMyStatsQuietly() }
+        }
+    }
+
+    // 서버 작업의 공통 처리: 로딩 켜기 → 작업 → 실패하면 오류 문구 → 로딩 끄기
+    // task: suspend () -> Unit  =  "suspend 함수를 부를 수 있는 람다"
+    private fun runTask(task: suspend () -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            try {
+                task()
+            } catch (e: CancellationException) {
+                throw e                             // 코루틴 취소는 오류가 아니므로 그대로 전달한다
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = e.message ?: "알 수 없는 오류가 발생했어요") }
+            } finally {
+                _uiState.update { it.copy(isLoading = false, isFirstLoad = false) }
+            }
+        }
+    }
+}
+    </script>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="group/GroupScreen.kt" data-path="app/src/main/java/com/example/mungtimer/group/GroupScreen.kt">
+package com.example.mungtimer.group
+
+import android.content.Intent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.mungtimer.model.MungCatalog
+
+@Composable
+fun GroupScreen(
+    modifier: Modifier = Modifier,
+    viewModel: GroupViewModel = viewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val group = uiState.group
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+    ) {
+        Text(text = "그룹", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+
+        // 오류가 있으면 빨간 글씨와 [다시 불러오기] 버튼을 보여 준다
+        val errorMessage = uiState.errorMessage
+        if (errorMessage != null) {
+            Text(text = errorMessage, color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = { viewModel.refresh() }) { Text("다시 불러오기") }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+
+        when {
+            // ① 앱을 켜고 처음 불러오는 중 → 가운데에 동그란 로딩 표시
+            uiState.isFirstLoad -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            // ② 아직 그룹이 없다 → 만들기 / 참여하기
+            group == null -> {
+                JoinOrCreateForm(
+                    isBusy = uiState.isLoading,
+                    onCreate = { groupName, nickname -> viewModel.createGroup(groupName, nickname) },
+                    onJoin = { code, nickname -> viewModel.joinGroup(code, nickname) },
+                )
+            }
+            // ③ 그룹이 있다 → 랭킹
+            else -> {
+                GroupBoard(
+                    group = group,
+                    ranking = buildRanking(uiState.members, uiState.period),
+                    myUid = uiState.myUid,
+                    period = uiState.period,
+                    onSelectPeriod = { viewModel.selectPeriod(it) },
+                    onLeave = { viewModel.leaveGroup() },
+                )
+            }
+        }
+    }
+}
+
+// 그룹이 없을 때: 닉네임을 정하고, 새로 만들거나 초대 코드로 참여한다
+@Composable
+fun JoinOrCreateForm(
+    isBusy: Boolean,                                        // 서버 작업 중이면 버튼을 잠근다 (두 번 누르기 방지)
+    onCreate: (groupName: String, nickname: String) -> Unit,
+    onJoin: (code: String, nickname: String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // 입력 중인 글자들. 화면 안에서만 쓰는 값이라 여기에 둔다 (회전해도 유지되도록 rememberSaveable)
+    var nickname by rememberSaveable { mutableStateOf("") }
+    var groupName by rememberSaveable { mutableStateOf("") }
+    var inviteCode by rememberSaveable { mutableStateOf("") }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),         // 키보드가 올라와도 스크롤할 수 있게
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("친구들과 공부 시간을 겨뤄 보세요. 먼저 그룹에서 쓸 닉네임을 정해요.")
+        OutlinedTextField(
+            value = nickname,                               // 상태를 받아 그리고
+            onValueChange = { nickname = it.take(12) },     // 바뀌면 상태를 고친다 (최대 12글자)
+            label = { Text("닉네임") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        HorizontalDivider()
+        Text(text = "새 그룹 만들기", fontWeight = FontWeight.Bold)
+        OutlinedTextField(
+            value = groupName,
+            onValueChange = { groupName = it.take(20) },
+            label = { Text("그룹 이름") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Button(
+            onClick = { onCreate(groupName, nickname) },
+            enabled = !isBusy,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(if (isBusy) "잠시만요…" else "그룹 만들기")
+        }
+
+        HorizontalDivider()
+        Text(text = "초대 코드로 참여하기", fontWeight = FontWeight.Bold)
+        OutlinedTextField(
+            value = inviteCode,
+            onValueChange = { inviteCode = it.uppercase().take(6) },    // 대문자 6글자까지만
+            label = { Text("초대 코드 6글자") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedButton(
+            onClick = { onJoin(inviteCode, nickname) },
+            enabled = !isBusy,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("참여하기")
+        }
+    }
+}
+
+// 그룹이 있을 때: 그룹 정보 + 기간 선택 + 랭킹
+@Composable
+fun GroupBoard(
+    group: StudyGroup,
+    ranking: List<RankRow>,
+    myUid: String,
+    period: RankPeriod,
+    onSelectPeriod: (RankPeriod) -> Unit,
+    onLeave: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current                      // 다른 앱(공유 창)을 띄울 때 필요
+
+    Column(modifier = modifier.fillMaxSize()) {
+        Text(text = group.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = "초대 코드 ${group.code}")
+            TextButton(onClick = {
+                // 공유 창 띄우기: 카카오톡, 메시지 등으로 코드를 보낼 수 있다
+                val intent = Intent(Intent.ACTION_SEND)
+                intent.type = "text/plain"
+                intent.putExtra(
+                    Intent.EXTRA_TEXT,
+                    "뭉타이머 그룹 '${group.name}'에서 같이 공부해요! 초대 코드: ${group.code}",
+                )
+                context.startActivity(Intent.createChooser(intent, "초대 코드 보내기"))
+            }) {
+                Text("초대하기")
+            }
+        }
+
+        // 오늘 / 이번 주 선택. entries로 enum의 모든 값을 돌며 칩을 만든다
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (option in RankPeriod.entries) {
+                FilterChip(
+                    selected = period == option,
+                    onClick = { onSelectPeriod(option) },
+                    label = { Text(option.label) },
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // LazyColumn: 화면에 보이는 줄만 그리는 세로 목록. weight(1f) = 남는 높이를 모두 차지
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(items = ranking, key = { it.member.uid }) { row ->
+                RankItem(row = row, isMe = row.member.uid == myUid)
+            }
+        }
+
+        TextButton(onClick = onLeave, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Text("그룹 나가기")
+        }
+    }
+}
+
+// 랭킹의 한 줄: [순위] [대표 뭉] 닉네임 / 뭉 수 ………… 공부 시간
+@Composable
+fun RankItem(row: RankRow, isMe: Boolean, modifier: Modifier = Modifier) {
+    val member = row.member
+    val featured = MungCatalog.findById(member.featuredMungId)     // 대표 뭉. 정하지 않았으면 null
+    val medal = when (row.rank) {
+        1 -> "🥇"
+        2 -> "🥈"
+        3 -> "🥉"
+        else -> "${row.rank}"
+    }
+    val subtitle = if (featured != null) {
+        "뭉 ${member.mungCount}마리 · 대표 ${featured.name}"
+    } else {
+        "뭉 ${member.mungCount}마리"
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                if (isMe) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+            )
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = medal, fontSize = 22.sp, textAlign = TextAlign.Center, modifier = Modifier.width(36.dp))
+
+        // 대표 뭉 (자랑!) — 없으면 알 모양
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(
+                    if (featured != null) Color(featured.grade.colorHex) else MaterialTheme.colorScheme.outlineVariant
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text = featured?.emoji ?: "🥚", fontSize = 22.sp)
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {            // weight(1f): 남는 가로 공간을 모두 차지
+            Text(
+                text = if (isMe) "${member.nickname} (나)" else member.nickname,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+            Text(text = subtitle, style = MaterialTheme.typography.labelMedium)
+        }
+
+        Text(text = formatDuration(row.seconds), fontWeight = FontWeight.Bold)
+    }
+}
+    </script>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="collection/CollectionViewModel.kt (Day 6 버전 — 파일 전체 교체)" data-path="app/src/main/java/com/example/mungtimer/collection/CollectionViewModel.kt" data-hl="7-8,10,13,16,18,30,36-46,52-57,60,68">
+package com.example.mungtimer.collection
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.mungtimer.data.AppDatabase
+import com.example.mungtimer.data.LocalPrefs
+import com.example.mungtimer.data.NO_FEATURED_MUNG
+import com.example.mungtimer.data.OwnedMung
+import com.example.mungtimer.group.GroupRepository
+import com.example.mungtimer.model.Mung
+import com.example.mungtimer.model.MungCatalog
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+// 도감의 한 칸: 어떤 뭉을 몇 마리 가졌는지 (0이면 아직 못 얻음)
+data class CollectionItem(
+    val mung: Mung,
+    val count: Int,
+)
+
+data class CollectionUiState(
+    val items: List<CollectionItem> = emptyList(),
+    val ownedKinds: Int = 0,        // 모은 종류 수
+    val totalCount: Int = 0,        // 모은 마리 수
+    val featuredMungId: Int = NO_FEATURED_MUNG,     // 내 대표 뭉
+)
+
+class CollectionViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val mungDao = AppDatabase.getInstance(application).mungDao()
+    private val localPrefs = LocalPrefs(application)
+    private val groupRepository = GroupRepository(application)
+
+    // 대표 뭉 id도 "바뀌면 알려 주는 값"이 되도록 StateFlow에 담아 둔다
+    private val featuredMungId = MutableStateFlow(localPrefs.featuredMungId())
+
+    // combine: 두 Flow 중 하나라도 바뀌면, 둘의 최신 값으로 다시 계산한다
+    val uiState: StateFlow<CollectionUiState> =
+        combine(mungDao.observeAll(), featuredMungId) { owned, featuredId ->
+            buildUiState(owned, featuredId)
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),    // 화면이 보고 있을 때만 DB를 관찰 (5초 여유)
+            initialValue = CollectionUiState(),                 // DB에서 첫 값이 오기 전에 보여 줄 값
+        )
+
+    // 대표 뭉 정하기: 기기에 저장 → 화면 갱신 → 그룹에 올리기
+    fun setFeatured(mungId: Int) {
+        localPrefs.setFeaturedMungId(mungId)
+        featuredMungId.value = mungId
+        viewModelScope.launch { groupRepository.syncMyStatsQuietly() }
+    }
+
+    // "얻은 뭉 목록" → "전체 12종 각각을 몇 마리 가졌는지"
+    private fun buildUiState(owned: List<OwnedMung>, featuredId: Int): CollectionUiState {
+        val items = MungCatalog.all.map { mung ->
+            CollectionItem(mung = mung, count = owned.count { it.mungId == mung.id })
+        }
+        return CollectionUiState(
+            items = items,
+            ownedKinds = items.count { it.count > 0 },
+            totalCount = owned.size,
+            featuredMungId = featuredId,
+        )
+    }
+}
+    </script>
+    <p><code>collection/CollectionScreen.kt</code>는 세 군데만 고칩니다(초록색 줄). ① 대표 뭉 칸에 👑 표시 ② 상세 창에 [대표 뭉으로 설정] 버튼 ③ 그 버튼을 ViewModel에 연결.</p>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="collection/CollectionScreen.kt (Day 6 버전 — 파일 전체 교체)" data-path="app/src/main/java/com/example/mungtimer/collection/CollectionScreen.kt" data-hl="68-72,79-87,93-98,130-132,138-143,161-163,169-174">
+package com.example.mungtimer.collection
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+
+@Composable
+fun CollectionScreen(
+    modifier: Modifier = Modifier,
+    viewModel: CollectionViewModel = viewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // 지금 상세 창으로 보고 있는 칸. null이면 창이 닫힌 상태 (화면 안에서만 쓰는 값이라 remember로 충분)
+    var selected by remember { mutableStateOf<CollectionItem?>(null) }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+    ) {
+        Text(text = "뭉 도감", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(
+            text = "${uiState.ownedKinds} / ${uiState.items.size}종 · 총 ${uiState.totalCount}마리",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // LazyVerticalGrid: 화면에 보이는 칸만 그리는 격자 목록. Fixed(3) = 한 줄에 3칸
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(items = uiState.items, key = { it.mung.id }) { item ->
+                MungCell(
+                    item = item,
+                    isFeatured = item.mung.id == uiState.featuredMungId,
+                    onClick = { selected = item },
+                )
+            }
+        }
+    }
+
+    val item = selected
+    if (item != null) {
+        MungDetailDialog(
+            item = item,
+            isFeatured = item.mung.id == uiState.featuredMungId,
+            onSetFeatured = {
+                viewModel.setFeatured(item.mung.id)
+                selected = null
+            },
+            onDismiss = { selected = null },
+        )
+    }
+}
+
+// 도감의 한 칸
+@Composable
+fun MungCell(
+    item: CollectionItem,
+    isFeatured: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isOwned = item.count > 0
+    val mung = item.mung
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(enabled = isOwned, onClick = onClick)    // 얻은 뭉만 누를 수 있다
+            .padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(if (isOwned) Color(mung.grade.colorHex) else MaterialTheme.colorScheme.outlineVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text = if (isOwned) mung.emoji else "?", fontSize = 28.sp)
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = if (isOwned) mung.name else "???",
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+        Text(
+            text = if (isOwned) "${mung.grade.label} ×${item.count}" else mung.grade.label,
+            style = MaterialTheme.typography.labelMedium,
+        )
+        if (isFeatured) {
+            Text(text = "👑 대표", style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+// 뭉 상세 창
+@Composable
+fun MungDetailDialog(
+    item: CollectionItem,
+    isFeatured: Boolean,
+    onSetFeatured: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mung = item.mung
+    val stars = "★".repeat(mung.grade.stars)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("${mung.emoji} ${mung.name}") },
+        text = {
+            Column {
+                Text(
+                    text = "${mung.grade.label} $stars",
+                    color = Color(mung.grade.colorHex),
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = mung.description, textAlign = TextAlign.Start)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "지금까지 ${item.count}마리를 만났어요")
+                if (isFeatured) {
+                    Text(text = "👑 지금 내 대표 뭉이에요")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("닫기") }
+        },
+        dismissButton = {
+            // 이미 대표 뭉이면 버튼을 숨긴다
+            if (!isFeatured) {
+                TextButton(onClick = onSetFeatured) { Text("대표 뭉으로 설정") }
+            }
+        },
+    )
+}
+    </script>
+    <p><code>timer/TimerViewModel.kt</code>는 초록색 줄만 추가합니다(import 1줄, 프로퍼티 1줄, <code>finish()</code> 끝의 ④).</p>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="timer/TimerViewModel.kt (Day 6 버전 — 파일 전체 교체)" data-path="app/src/main/java/com/example/mungtimer/timer/TimerViewModel.kt" data-hl="12,53-54,112-113">
+package com.example.mungtimer.timer
+
+import android.app.Application
+import android.content.Context
+import androidx.core.content.edit
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.mungtimer.data.AppDatabase
+import com.example.mungtimer.data.OwnedMung
+import com.example.mungtimer.data.StudySession
+import com.example.mungtimer.data.todayKey
+import com.example.mungtimer.group.GroupRepository
+import com.example.mungtimer.model.Mung
+import com.example.mungtimer.model.MungGacha
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
+// 저장할 때 쓰는 이름표들
+private const val KEY_STATUS = "status"
+private const val KEY_STARTED_AT = "startedAt"
+private const val KEY_ACCUMULATED = "accumulated"
+
+// 종료 결과: 공부한 시간과, 나온 뭉 (30분 미만이면 null)
+data class FinishResult(
+    val studySeconds: Long,
+    val mung: Mung?,
+)
+
+// 타이머 화면에 필요한 모든 값
+data class TimerUiState(
+    val status: TimerStatus = TimerStatus.IDLE,
+    val elapsedSeconds: Long = 0,
+    val result: FinishResult? = null,       // 방금 종료한 결과. null이면 결과 창을 띄우지 않는다
+)
+
+// AndroidViewModel: 저장소를 쓰기 위해 Application(앱 전체를 대표하는 객체)을 받는 ViewModel
+class TimerViewModel(application: Application) : AndroidViewModel(application) {
+
+    // 값 몇 개를 기기에 저장하는 작은 메모장
+    private val prefs = application.getSharedPreferences("timer", Context.MODE_PRIVATE)
+
+    // 데이터베이스의 사서(DAO) 두 명
+    private val database = AppDatabase.getInstance(application)
+    private val mungDao = database.mungDao()
+    private val studyDao = database.studyDao()
+
+    // 그룹(Firebase)에 내 기록을 올려 주는 저장소
+    private val groupRepository = GroupRepository(application)
+
+    private val _uiState = MutableStateFlow(TimerUiState())
+    val uiState: StateFlow<TimerUiState> = _uiState.asStateFlow()
+
+    private var startedAt = 0L          // 지금 구간을 시작한 시각(ms). 멈춰 있으면 0
+    private var accumulated = 0L        // 이전 구간들에서 쌓인 시간(ms)
+    private var tickJob: Job? = null    // 화면 갱신 코루틴의 리모컨
+
+    init {
+        restore()                       // ViewModel이 만들어질 때 저장된 타이머를 이어 간다
+    }
+
+    fun start() {
+        if (_uiState.value.status == TimerStatus.RUNNING) return
+        startedAt = System.currentTimeMillis()      // 시각을 적어 둔다
+        save(TimerStatus.RUNNING)
+        startTicking()
+    }
+
+    fun pause() {
+        if (_uiState.value.status != TimerStatus.RUNNING) return
+        tickJob?.cancel()
+        accumulated = elapsedMillis()               // 지금까지의 시간을 쌓아 두고
+        startedAt = 0L                              // 멈춤 표시
+        save(TimerStatus.PAUSED)
+        _uiState.update { it.copy(status = TimerStatus.PAUSED, elapsedSeconds = accumulated / 1000) }
+    }
+
+    fun finish() {
+        if (_uiState.value.status == TimerStatus.IDLE) return
+        tickJob?.cancel()
+        val totalSeconds = elapsedMillis() / 1000   // 초기화하기 전에 총 시간을 먼저 구한다
+        startedAt = 0L
+        accumulated = 0L
+        save(TimerStatus.IDLE)
+        _uiState.update { TimerUiState() }          // 화면은 바로 처음 상태로
+
+        // DB 저장은 suspend 함수 → 코루틴 안에서
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+
+            // ① 공부 기록 저장 (내일 그룹 랭킹의 재료)
+            if (totalSeconds > 0) {
+                studyDao.insert(StudySession(dateKey = todayKey(), seconds = totalSeconds, endedAt = now))
+            }
+
+            // ② 30분 이상이면 뭉을 뽑아 도감에 저장
+            val mung = if (canGetMung(totalSeconds)) MungGacha.draw(totalSeconds / 60) else null
+            if (mung != null) {
+                mungDao.insert(
+                    OwnedMung(mungId = mung.id, obtainedAt = now, studyMinutes = (totalSeconds / 60).toInt())
+                )
+            }
+
+            // ③ 결과 창 띄우기
+            _uiState.update { it.copy(result = FinishResult(totalSeconds, mung)) }
+
+            // ④ 그룹에 내 기록 올리기. 결과 창을 먼저 띄운 뒤에 한다 (인터넷이 느려도 기다리지 않게)
+            groupRepository.syncMyStatsQuietly()
+        }
+    }
+
+    // 결과 창을 닫는다
+    fun dismissResult() {
+        _uiState.update { it.copy(result = null) }
+    }
+
+    // 경과 시간(ms) = 쌓인 시간 + (지금 − 시작 시각)
+    private fun elapsedMillis(): Long {
+        if (startedAt == 0L) return accumulated
+        val runningPart = System.currentTimeMillis() - startedAt
+        return accumulated + runningPart.coerceAtLeast(0L)   // 기기 시계가 뒤로 바뀌어도 음수는 되지 않게
+    }
+
+    // 0.5초마다 시계를 다시 읽어 화면 상태를 갱신한다. "세는" 것이 아니라 "읽는" 것!
+    private fun startTicking() {
+        tickJob?.cancel()
+        tickJob = viewModelScope.launch {
+            while (isActive) {
+                _uiState.update {
+                    it.copy(status = TimerStatus.RUNNING, elapsedSeconds = elapsedMillis() / 1000)
+                }
+                delay(500)
+            }
+        }
+    }
+
+    private fun save(status: TimerStatus) {
+        prefs.edit {
+            putString(KEY_STATUS, status.name)      // enum → "RUNNING" 같은 문자열
+            putLong(KEY_STARTED_AT, startedAt)
+            putLong(KEY_ACCUMULATED, accumulated)
+        }
+    }
+
+    private fun restore() {
+        val savedStatus = prefs.getString(KEY_STATUS, null) ?: return   // 저장된 적이 없으면 그대로 시작
+        startedAt = prefs.getLong(KEY_STARTED_AT, 0L)
+        accumulated = prefs.getLong(KEY_ACCUMULATED, 0L)
+
+        when (TimerStatus.valueOf(savedStatus)) {   // 문자열 → enum
+            TimerStatus.RUNNING -> startTicking()   // 시작 시각이 그대로라 경과 시간은 저절로 맞는다
+            TimerStatus.PAUSED -> _uiState.update {
+                it.copy(status = TimerStatus.PAUSED, elapsedSeconds = accumulated / 1000)
+            }
+            TimerStatus.IDLE -> Unit                // 할 일 없음
+        }
+    }
+}
+    </script>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="MainActivity.kt (Day 6 버전 — 탭 3개)" data-path="app/src/main/java/com/example/mungtimer/MainActivity.kt" data-hl="19,29,49-54,61-62">
+package com.example.mungtimer
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import com.example.mungtimer.collection.CollectionScreen
+import com.example.mungtimer.group.GroupScreen
+import com.example.mungtimer.timer.TimerScreen
+import com.example.mungtimer.ui.theme.MungTimerTheme
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            MungTimerTheme {
+                // 지금 보고 있는 탭. 0 = 타이머, 1 = 도감, 2 = 그룹
+                // rememberSaveable: 화면을 회전해도 기억하는 remember
+                var currentTab by rememberSaveable { mutableIntStateOf(0) }
+
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    bottomBar = {                       // 화면 아래 고정되는 탭 막대
+                        NavigationBar {
+                            NavigationBarItem(
+                                selected = currentTab == 0,
+                                onClick = { currentTab = 0 },
+                                icon = { Text("⏱️") },
+                                label = { Text("타이머") },
+                            )
+                            NavigationBarItem(
+                                selected = currentTab == 1,
+                                onClick = { currentTab = 1 },
+                                icon = { Text("📖") },
+                                label = { Text("도감") },
+                            )
+                            NavigationBarItem(
+                                selected = currentTab == 2,
+                                onClick = { currentTab = 2 },
+                                icon = { Text("👥") },
+                                label = { Text("그룹") },
+                            )
+                        }
+                    },
+                ) { innerPadding ->
+                    // 상태에 따라 다른 화면을 그린다 (Day 7에 Navigation으로 교체)
+                    when (currentTab) {
+                        0 -> TimerScreen(modifier = Modifier.padding(innerPadding))
+                        1 -> CollectionScreen(modifier = Modifier.padding(innerPadding))
+                        else -> GroupScreen(modifier = Modifier.padding(innerPadding))
+                    }
+                }
+            }
+        }
+    }
+}
+    </script>
+    <p><b>확인 포인트:</b> ① 화면(<code>GroupScreen</code>) → ViewModel → Repository → Firebase 순서로만 부릅니다. 화면은 Firebase를 전혀 모릅니다. ② 그룹 화면의 랭킹은 <code>buildRanking()</code>이라는 순수 함수가 만듭니다. Playground에서 검증한 그 함수입니다. ③ 타이머를 종료한 직후 그룹 탭에 가면 내 시간이 올라가 있습니다. ④ 비행기 모드에서 종료해도 앱이 죽지 않습니다(조용히 실패하고, 다음에 그룹 화면을 열 때 다시 올립니다).</p>
+  </details>
+
+  <h3>더 해 보고 싶다면: 익명 계정을 이메일 계정에 연결하기</h3>
+  <p>익명 계정은 앱을 삭제하면 사라집니다. 아래처럼 <b>지금의 익명 계정에 이메일/비밀번호를 연결</b>하면 uid와 그룹 소속을 그대로 유지한 채 "진짜 계정"이 됩니다(콘솔의 로그인 방법에서 <b>이메일/비밀번호</b>도 켜야 합니다). 입력 화면과 로그인 화면이 더 필요하므로 7일 과정의 과제에는 넣지 않았습니다.</p>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="group/AccountLink.kt (선택 과제의 출발점)" data-path="app/src/main/java/com/example/mungtimer/group/AccountLink.kt">
+package com.example.mungtimer.group
+
+import com.google.firebase.Firebase
+import com.google.firebase.auth.EmailAuthProvider
+import com.google.firebase.auth.auth
+import kotlinx.coroutines.tasks.await
+
+// 지금 로그인된 익명 계정에 이메일/비밀번호를 연결한다. uid는 바뀌지 않는다
+suspend fun linkEmailToCurrentUser(email: String, password: String) {
+    val user = Firebase.auth.currentUser ?: error("먼저 로그인되어 있어야 해요")
+    val credential = EmailAuthProvider.getCredential(email, password)
+    user.linkWithCredential(credential).await()
+}
+
+// 다른 기기(또는 재설치 후)에서 같은 계정으로 다시 들어오기
+suspend fun signInWithEmail(email: String, password: String) {
+    Firebase.auth.signInWithEmailAndPassword(email, password).await()
+}
+  </script>
+</section>
+
+</template>
 <!-- =====================================================================
      ▲▲▲ 콘텐츠 데이터 끝 ▲▲▲   ▼▼▼ 동작(JS) ▼▼▼
      ===================================================================== -->
