@@ -4796,6 +4796,7 @@ import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.WriteBatch
 import com.google.firebase.firestore.firestore
 import com.google.firebase.firestore.snapshots
 import kotlinx.coroutines.CancellationException
@@ -4879,16 +4880,21 @@ class GroupRepository(context: Context) {
             code = newInviteCode()
         }
 
-        // set(지도): 문서를 만든다. mapOf("필드 이름" to 값, …)
-        groupRef(code).set(
-            mapOf(
+        // "그룹 문서 만들기"와 "내가 멤버로 들어가기"를 한 묶음(batch)으로 보낸다.
+        // 묶음 안의 쓰기는 전부 성공하거나 전부 실패하므로, 절반만 저장되는 일이 없다
+        val batch = firestore.batch()
+        batch.set(
+            groupRef(code),
+            mapOf(                                              // mapOf("필드 이름" to 값, …)
                 "name" to groupName,
                 "ownerUid" to uid,
                 "createdAt" to FieldValue.serverTimestamp(),    // 서버의 현재 시각
-            )
-        ).await()
+            ),
+        )
+        addMembership(batch, uid, code, nickname)
+        batch.commit().await()                          // 묶음을 서버로 보내고 기다린다
 
-        saveMembership(uid, code, nickname)
+        syncMyStats()                                   // 지금까지의 기록을 바로 올린다
         return code
     }
 
@@ -4896,15 +4902,19 @@ class GroupRepository(context: Context) {
     suspend fun joinGroup(code: String, nickname: String) {
         val uid = ensureSignedIn()
         if (findGroup(code) == null) error("초대 코드에 해당하는 그룹이 없어요")
-        saveMembership(uid, code, nickname)
+
+        val batch = firestore.batch()
+        addMembership(batch, uid, code, nickname)
+        batch.commit().await()
+
+        syncMyStats()
     }
 
-    // 멤버 문서와 내 프로필을 저장한다 (만들기와 참여의 공통 부분)
-    private suspend fun saveMembership(uid: String, code: String, nickname: String) {
+    // 묶음에 "멤버 문서 쓰기 + 내 프로필 쓰기"를 담는다 (만들기와 참여의 공통 부분)
+    private fun addMembership(batch: WriteBatch, uid: String, code: String, nickname: String) {
         // SetOptions.merge(): 문서 전체를 갈아 끼우지 않고, 적은 필드만 덮어쓴다
-        memberRef(code, uid).set(mapOf("nickname" to nickname), SetOptions.merge()).await()
-        userRef(uid).set(mapOf("groupCode" to code, "nickname" to nickname)).await()
-        syncMyStats()                                   // 지금까지의 기록을 바로 올린다
+        batch.set(memberRef(code, uid), mapOf("nickname" to nickname), SetOptions.merge())
+        batch.set(userRef(uid), mapOf("groupCode" to code, "nickname" to nickname))
     }
 
     // 내 기기(Room)의 기록을 그룹의 내 문서에 올린다
@@ -4942,8 +4952,12 @@ class GroupRepository(context: Context) {
     suspend fun leaveGroup() {
         val uid = ensureSignedIn()
         val code = myGroupCode() ?: return
-        memberRef(code, uid).delete().await()
-        userRef(uid).delete().await()
+
+        // 멤버 문서와 내 프로필을 한 묶음으로 지운다
+        val batch = firestore.batch()
+        batch.delete(memberRef(code, uid))
+        batch.delete(userRef(uid))
+        batch.commit().await()
     }
 
     // 6글자 초대 코드. 헷갈리는 글자(0과 O, 1과 I)는 뺐다
@@ -4953,7 +4967,7 @@ class GroupRepository(context: Context) {
     }
 }
   </script>
-  <div class="note"><b>읽는 요령.</b> 모든 함수가 같은 리듬입니다. ① <code>ensureSignedIn()</code>으로 내 uid를 얻고 ② 문서의 주소(<code>…Ref</code>)를 만들고 ③ <code>get()</code> / <code>set()</code> / <code>delete()</code> 뒤에 <code>.await()</code>. <code>as? Map&lt;*, *&gt;</code>는 "Map이면 Map으로, 아니면 null"이라는 안전한 형 변환입니다.</div>
+  <div class="note"><b>읽는 요령.</b> 모든 함수가 같은 리듬입니다. ① <code>ensureSignedIn()</code>으로 내 uid를 얻고 ② 문서의 주소(<code>…Ref</code>)를 만들고 ③ <code>get()</code> / <code>set()</code> 뒤에 <code>.await()</code>. 문서 여러 장을 함께 바꿔야 할 때는 <code>batch</code>(묶음)에 담아 <code>commit()</code> 한 번으로 보냅니다. 중간에 실패해 "그룹에는 들어갔는데 내 프로필에는 기록이 없는" 어긋난 상태가 생기지 않습니다. <code>as? Map&lt;*, *&gt;</code>는 "Map이면 Map으로, 아니면 null"이라는 안전한 형 변환입니다.</div>
 </section>
 
 <section class="sec" data-sec="studio">
@@ -5375,6 +5389,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -5418,6 +5433,10 @@ fun GroupScreen(
         if (errorMessage != null) {
             Text(text = errorMessage, color = MaterialTheme.colorScheme.error)
             TextButton(onClick = { viewModel.refresh() }) { Text("다시 불러오기") }
+        }
+        // 서버 작업 중이면 가느다란 진행 막대를 보여 준다
+        if (uiState.isLoading && !uiState.isFirstLoad) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -6143,6 +6162,873 @@ suspend fun signInWithEmail(email: String, password: String) {
     Firebase.auth.signInWithEmailAndPassword(email, password).await()
 }
   </script>
+</section>
+
+</template>
+
+<!-- ===================== Day 7 : 화면 이동, 마무리, APK ===================== -->
+<template id="page-day7">
+
+<section class="sec" data-sec="goal">
+  <p>기능은 어제까지 모두 만들었습니다. 오늘은 "돌아가기는 하는 앱"을 <b>"친구에게 보여 줄 수 있는 앱"</b>으로 다듬습니다. 화면 이동을 정식 라이브러리로 바꾸고, 색과 이름과 아이콘을 입히고, 버그를 잡고, 설치 파일(APK)을 만듭니다.</p>
+  <h3>오늘이 끝나면 할 수 있는 것</h3>
+  <ul>
+    <li><b>Navigation 3</b>로 화면 이동과 뒤로 가기를 구현할 수 있다.</li>
+    <li>Material 3 테마의 색을 바꿔 앱 전체의 분위기를 한 번에 바꿀 수 있다.</li>
+    <li>앱 이름과 아이콘을 바꿀 수 있다.</li>
+    <li>버그를 "재현 → 원인 찾기 → 수정 → 다시 확인" 순서로 잡을 수 있다.</li>
+    <li>APK 파일을 만들어 다른 폰에 설치할 수 있다.</li>
+  </ul>
+  <div class="link-app">
+    <div class="ico">🔗</div>
+    <div><b>최종 앱과의 연결</b>
+    Day 5에 "임시"로 만든 탭 전환을 정식 Navigation으로 교체하고, 명세의 네 기능(타이머 · 뭉 뽑기 · 도감 · 그룹)을 처음부터 끝까지 점검합니다. 오늘 과제가 끝나면 <b>뭉타이머 완성</b>입니다.</div>
+  </div>
+</section>
+
+<section class="sec" data-sec="concept">
+  <h3>1. 임시 탭 전환의 문제</h3>
+  <p>지금 앱에서 <b>도감 탭을 연 뒤 폰의 뒤로 가기</b>를 해 보세요. 타이머로 돌아가지 않고 <b>앱이 닫힙니다</b>. Day 5의 방식은 "지금 몇 번 탭인가"라는 숫자 하나만 기억할 뿐, "어디를 거쳐 왔는가"를 모르기 때문입니다. 안드로이드 사용자는 뒤로 가기가 <b>직전 화면</b>으로 데려다주기를 기대합니다.</p>
+
+  <h3>2. 백 스택: 화면을 쌓아 둔 목록</h3>
+  <div class="note analogy"><b>비유 — 접시 쌓기.</b> 새 화면으로 가면 접시를 한 장 <b>위에 올리고</b>, 뒤로 가면 맨 위 접시를 <b>내립니다</b>. 지금 보이는 화면은 항상 맨 위 접시입니다. 접시가 한 장 남았을 때 뒤로 가면 앱이 닫힙니다. 이 더미를 <b>백 스택(back stack)</b>이라고 합니다.</div>
+
+  <h3>3. Navigation 3: "백 스택은 내가 가진 목록이다"</h3>
+  <p>Navigation 3는 Compose를 위해 새로 만들어진 화면 이동 라이브러리입니다. 핵심 생각은 아주 단순합니다. <b>백 스택은 그냥 목록(List)이고, 그 목록의 주인은 나</b>입니다. 목록에 넣으면 앞으로 가고, 빼면 뒤로 갑니다. Day 2의 <code>MutableList</code>와 Day 3의 "상태가 바뀌면 화면이 바뀐다"가 합쳐진 것입니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>요소</th><th>역할</th><th>뭉타이머에서</th></tr>
+    <tr><td><b>키(key)</b></td><td>화면을 가리키는 이름표. 어떤 타입이든 될 수 있다</td><td><code>enum class Screen { TIMER, COLLECTION, GROUP }</code></td></tr>
+    <tr><td><b>백 스택</b></td><td>키를 쌓아 둔, Compose가 지켜보는 목록</td><td><code>mutableStateListOf(Screen.TIMER)</code></td></tr>
+    <tr><td><code>NavDisplay</code></td><td>백 스택의 <b>맨 위 키</b>에 해당하는 화면을 보여 주고, 뒤로 가기 제스처를 받아 준다</td><td><code>Scaffold</code> 안쪽에 배치</td></tr>
+    <tr><td><code>entryProvider</code></td><td>"이 키면 이 화면"을 알려 주는 함수</td><td><code>when (key) { Screen.TIMER -&gt; … }</code></td></tr>
+  </table></div>
+  <div class="note"><b>인터넷에서 <code>NavHost</code>, <code>NavController</code>, <code>route</code>가 나오는 글을 봤다면</b> — 그것은 이전 세대인 Navigation 2(Navigation Compose)입니다. 지금은 새 기능이 추가되지 않는 유지보수 단계이고, Compose 앱에는 Navigation 3가 권장됩니다. 개념은 그대로 대응됩니다: <code>NavController</code> ↔ 백 스택 목록, <code>NavHost</code> ↔ <code>NavDisplay</code>, <code>route</code> ↔ 키.</div>
+
+  <h3>4. 하단 탭의 백 스택 규칙</h3>
+  <p>탭이 3개인 뭉타이머는 규칙을 하나만 정하면 됩니다. <b>백 스택은 항상 <code>[타이머]</code> 또는 <code>[타이머, 다른 탭]</code></b>.</p>
+  <div class="table-wrap"><table>
+    <tr><th>사용자 행동</th><th>백 스택</th><th>보이는 화면</th></tr>
+    <tr><td>앱 실행</td><td><code>[타이머]</code></td><td>타이머</td></tr>
+    <tr><td>도감 탭 누름</td><td><code>[타이머, 도감]</code></td><td>도감</td></tr>
+    <tr><td>그룹 탭 누름</td><td><code>[타이머, 그룹]</code> <small>(도감을 내리고 그룹을 올림)</small></td><td>그룹</td></tr>
+    <tr><td>뒤로 가기</td><td><code>[타이머]</code></td><td>타이머</td></tr>
+    <tr><td>뒤로 가기</td><td>더 내릴 것이 없음</td><td>앱이 닫힘</td></tr>
+  </table></div>
+  <p>탭을 이리저리 눌러도 접시가 끝없이 쌓이지 않고, 어디서든 뒤로 가기 한 번이면 타이머로, 한 번 더 누르면 앱이 닫힙니다.</p>
+
+  <h3>5. 백 스택은 어디에 둘까</h3>
+  <p>Day 4의 복습입니다. 백 스택을 <code>remember</code>로 만들면 화면을 회전할 때 사라져서 타이머 탭으로 돌아가 버립니다. 회전해도 살아남아야 하는 상태는 <b>ViewModel</b>에 둡니다. 그래서 <code>NavViewModel</code>을 만들어 백 스택과 "탭 선택 / 뒤로 가기" 규칙을 맡깁니다.</p>
+  <div class="note honest">ViewModel도 앱(프로세스)이 종료되면 사라지므로, 앱이 완전히 꺼졌다 켜지면 타이머 탭에서 시작합니다. 탭 3개짜리 앱에서는 자연스러운 동작입니다. 종료 후에도 보던 화면을 복원하려면 Navigation 3의 <code>rememberNavBackStack()</code>과 kotlinx.serialization 플러그인을 써야 하는데, 설정이 늘어나 7일 범위에서는 뺐습니다.</div>
+
+  <h3>6. 테마: 색에 "역할"을 주기</h3>
+  <p>지금까지 <code>MaterialTheme.colorScheme.primaryContainer</code>처럼 색을 <b>역할 이름</b>으로 써 왔습니다. <code>Color(0xFF…)</code>를 화면마다 직접 적지 않은 덕분에, 오늘 <code>Theme.kt</code>에서 역할에 연결된 색만 바꾸면 <b>모든 화면이 한꺼번에</b> 뭉 색감으로 바뀌고 다크 모드도 자동으로 대응됩니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>역할</th><th>쓰이는 곳</th></tr>
+    <tr><td><code>primary</code> / <code>onPrimary</code></td><td>주요 버튼의 배경 / 그 위의 글자</td></tr>
+    <tr><td><code>primaryContainer</code></td><td>뭉 얼굴의 동그란 배경, 랭킹의 내 줄</td></tr>
+    <tr><td><code>secondaryContainer</code></td><td>하단 탭에서 선택된 탭의 표시</td></tr>
+    <tr><td><code>background</code> / <code>surface</code></td><td>화면 바탕</td></tr>
+    <tr><td><code>surfaceVariant</code></td><td>도감 칸, 랭킹 줄의 배경</td></tr>
+  </table></div>
+  <p>마법사가 만든 테마는 <b>다이내믹 컬러</b>(Android 12 이상에서 배경화면 색을 따라가는 기능)가 켜져 있어 폰마다 색이 다르게 보입니다. 뭉타이머만의 색을 쓰기 위해 이 기능을 끕니다.</p>
+
+  <h3>7. 버그를 잡는 순서</h3>
+  <ol class="steps">
+    <li><b>재현하기</b> — "어떻게 하면 그 문제가 다시 생기는가"를 찾습니다. 항상 다시 만들 수 있어야 고쳤는지도 확인할 수 있습니다.</li>
+    <li><b>증거 모으기</b> — 앱이 죽었다면 Logcat의 <code>package:mine level:error</code>에서 예외 이름과 <code>내파일.kt:줄번호</code>를 찾습니다. 죽지는 않고 값이 이상하다면 <code>Log.d</code>나 브레이크포인트로 값을 확인합니다.</li>
+    <li><b>원인 한 줄로 말하기</b> — "○○일 때 △△가 □□라서"라고 한 문장으로 말할 수 있을 때까지 좁힙니다.</li>
+    <li><b>가장 작게 고치기</b> — 원인만 고칩니다. 겸사겸사 다른 곳까지 고치면 새 버그가 생깁니다.</li>
+    <li><b>다시 확인하기</b> — 1번의 방법으로 문제가 사라졌는지, 주변 기능이 그대로인지 확인합니다.</li>
+  </ol>
+
+  <h3>8. APK와 서명</h3>
+  <p><b>APK</b>는 안드로이드 앱의 설치 파일입니다. 모든 APK에는 "누가 만들었는지"를 증명하는 <b>서명</b>이 들어가며, 안드로이드는 <b>같은 서명일 때만 덮어 설치(업데이트)</b>를 허락합니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th></th><th>debug APK</th><th>release APK</th></tr>
+    <tr><td>서명</td><td>내 컴퓨터에 자동으로 만들어진 디버그 키</td><td>내가 직접 만든 키(키스토어)</td></tr>
+    <tr><td>용도</td><td>개발, 친구에게 시험 삼아 전달</td><td>정식 배포</td></tr>
+    <tr><td>만드는 법</td><td>메뉴 한 번</td><td>키스토어 생성 + 비밀번호 관리</td></tr>
+  </table></div>
+  <div class="note honest"><b>7일 과정의 목표는 debug APK입니다.</b> 친구 몇 명에게 보내 설치하는 데는 충분합니다. 플레이 스토어 출시는 유료 개발자 계정, 서명 키 관리, 심사, 개인정보처리방침이 필요해 범위 밖입니다. 또 구글은 2026년 9월부터 일부 국가(브라질 · 인도네시아 · 싱가포르 · 태국)에서 <b>인증되지 않은 개발자의 앱 설치를 제한</b>하기 시작했고 2027년에 전 세계로 넓힐 예정이라고 안내하고 있습니다. 학생과 취미 개발자가 신분증이나 등록비 없이 최대 20대의 기기에 앱을 공유할 수 있는 "limited distribution 계정"도 함께 안내하고 있으니, 한국에 적용되는 시점이 오면 <a href="https://developer.android.com/developer-verification" target="_blank" rel="noopener">developer.android.com/developer-verification</a>의 최신 안내를 확인하세요. USB로 연결해 <b>Run ▶</b>으로 설치하는 개발 방식은 그대로 쓸 수 있습니다.</div>
+</section>
+
+<section class="sec" data-sec="example">
+  <h3>예제 1. 백 스택을 목록으로 흉내 내기 <small>(Kotlin Playground)</small></h3>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="Ex1.kt" data-run="d7_ex1">
+// 백 스택 = 화면 이름을 쌓아 둔 목록. 맨 뒤(last)가 지금 보이는 화면
+val backStack = mutableListOf("타이머")
+
+fun show() {
+    println("백 스택 $backStack → 보이는 화면: ${backStack.last()}")
+}
+
+// 하단 탭을 눌렀을 때의 규칙: 항상 [타이머] 또는 [타이머, 다른 탭]
+fun selectTab(tab: String) {
+    while (backStack.size > 1) backStack.removeLastOrNull()   // 타이머만 남기고 내린다
+    if (tab != "타이머") backStack.add(tab)                    // 고른 탭을 올린다
+    show()
+}
+
+// 뒤로 가기: 내릴 접시가 있으면 내리고, 없으면 앱이 닫힌다
+fun goBack() {
+    if (backStack.size > 1) {
+        backStack.removeLastOrNull()
+        show()
+    } else {
+        println("더 돌아갈 곳이 없어요 → 앱이 닫힌다")
+    }
+}
+
+fun main() {
+    show()
+    selectTab("도감")
+    selectTab("그룹")       // 도감을 내리고 그룹을 올린다
+    selectTab("그룹")       // 같은 탭을 또 눌러도 쌓이지 않는다
+    goBack()
+    goBack()
+}
+  </script>
+  <script type="text/plain" class="code" data-lang="output" data-for="d7_ex1">
+백 스택 [타이머] → 보이는 화면: 타이머
+백 스택 [타이머, 도감] → 보이는 화면: 도감
+백 스택 [타이머, 그룹] → 보이는 화면: 그룹
+백 스택 [타이머, 그룹] → 보이는 화면: 그룹
+백 스택 [타이머] → 보이는 화면: 타이머
+더 돌아갈 곳이 없어요 → 앱이 닫힌다
+  </script>
+  <div class="note"><code>removeLast()</code>가 아니라 <code>removeLastOrNull()</code>을 쓰는 이유: 이름이 비슷한 <code>removeLast()</code>는 최신 자바의 기능과 이름이 겹쳐서, 안드로이드 14 이하 기기에서 실행 중 오류(<code>NoSuchMethodError</code>)를 일으킬 수 있습니다. <code>removeLastOrNull()</code>은 코틀린이 제공하는 함수라 모든 기기에서 안전하고, 목록이 비어 있어도 죽지 않습니다.</div>
+
+  <h3>예제 2. Navigation 3 — 목록에서 상세 화면으로, 데이터와 함께 이동</h3>
+  <p>아래 "안드로이드 스튜디오 사용법 A"의 라이브러리 2줄을 먼저 추가하세요. 키가 <code>data class</code>이면 <b>화면에 전달할 값</b>(어떤 뭉을 눌렀는지)을 함께 실어 보낼 수 있습니다.</p>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="practice/Day7Navigation.kt" data-path="app/src/main/java/com/example/mungtimer/practice/Day7Navigation.kt">
+package com.example.mungtimer.practice
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.ui.NavDisplay
+import com.example.mungtimer.model.MungCatalog
+
+// ① 키: 화면을 가리키는 이름표
+data object MungListKey                         // 값이 필요 없는 화면은 data object
+data class MungDetailKey(val mungId: Int)       // 값을 실어 보낼 화면은 data class
+
+@Composable
+fun MungBrowser(modifier: Modifier = Modifier) {
+    // ② 백 스택: Compose가 지켜보는 목록. 처음에는 목록 화면 하나
+    //    (연습용이라 remember에 둔다. 회전하면 처음으로 돌아간다)
+    val backStack = remember { mutableStateListOf<Any>(MungListKey) }
+
+    // ③ NavDisplay: 백 스택의 맨 위 키에 해당하는 화면을 보여 준다
+    NavDisplay(
+        backStack = backStack,
+        onBack = { backStack.removeLastOrNull() },      // 폰의 뒤로 가기 → 맨 위를 내린다
+        modifier = modifier,
+        // ④ entryProvider: "이 키면 이 화면". entry<키 타입> { 화면 }
+        entryProvider = entryProvider {
+            entry<MungListKey> {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    for (mung in MungCatalog.all) {
+                        Text(
+                            text = "${mung.emoji} ${mung.name}",
+                            fontSize = 20.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                // 누르면 그 뭉의 id를 실은 키를 올린다 = 상세 화면으로 이동
+                                .clickable { backStack.add(MungDetailKey(mung.id)) }
+                                .padding(12.dp),
+                        )
+                    }
+                }
+            }
+            entry<MungDetailKey> { key ->               // key로 실려 온 값을 꺼낸다
+                val mung = MungCatalog.findById(key.mungId)
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(text = mung?.emoji ?: "?", fontSize = 64.sp)
+                    Text(text = mung?.name ?: "없는 뭉", fontSize = 24.sp)
+                    Text(text = mung?.description ?: "")
+                    Button(onClick = { backStack.removeLastOrNull() }) {    // 화면 안의 버튼으로도 뒤로
+                        Text("목록으로")
+                    }
+                }
+            }
+        },
+    )
+}
+  </script>
+  <div class="note"><b>확인해 보기:</b> <code>MainActivity</code>에서 잠깐 <code>MungBrowser(modifier = Modifier.padding(innerPadding))</code>을 보여 주게 바꿔 실행하세요. 뭉을 누르면 상세 화면이 미끄러지듯 나타나고, 폰의 뒤로 가기로 목록에 돌아옵니다. 화면 전환 애니메이션은 <code>NavDisplay</code>가 기본으로 넣어 줍니다.</div>
+
+  <h3>예제 3. 뭉 색감의 테마 <small>(앱 파일 2개 교체)</small></h3>
+  <p><code>ui/theme</code> 패키지의 두 파일을 통째로 바꿉니다. <code>Type.kt</code>는 그대로 둡니다.</p>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="ui/theme/Color.kt (파일 전체 교체)" data-path="app/src/main/java/com/example/mungtimer/ui/theme/Color.kt">
+package com.example.mungtimer.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+// ── 밝은 테마의 색 ──────────────────────────────
+val MungPink = Color(0xFFC2385C)              // 주요 버튼 (흰 글자가 잘 보이도록 진한 분홍)
+val MungPinkSoft = Color(0xFFFFD9E0)          // 뭉 얼굴 배경, 랭킹의 내 줄
+val MungPinkInk = Color(0xFF3F0018)           // 연한 분홍 위의 글자
+val MungMint = Color(0xFF1E7A61)
+val MungMintSoft = Color(0xFFBFF0E0)          // 선택된 탭 표시
+val MungMintInk = Color(0xFF00382B)
+val MungLavender = Color(0xFF5B45B0)
+val MungCream = Color(0xFFFFF8F3)             // 화면 바탕
+val MungCreamDeep = Color(0xFFFBEEE8)         // 하단 탭 막대
+val MungCreamDeeper = Color(0xFFF8E7E1)       // 알림 창
+val MungPeach = Color(0xFFFBE4E0)             // 도감 칸, 랭킹 줄
+val MungInk = Color(0xFF3D2C3A)               // 기본 글자
+val MungInkSoft = Color(0xFF6E5967)           // 덜 중요한 글자
+val MungLine = Color(0xFFE6CFC9)              // 흐린 선, 못 얻은 뭉의 동그라미
+
+// ── 어두운 테마의 색 ────────────────────────────
+val NightPink = Color(0xFFFFB1C1)
+val NightPinkInk = Color(0xFF5E1130)
+val NightPinkDeep = Color(0xFF7C2946)
+val NightMint = Color(0xFF8FE3CA)
+val NightMintDeep = Color(0xFF1F5445)
+val NightLavender = Color(0xFFCBBCFA)
+val NightBackground = Color(0xFF1D1721)
+val NightSurface = Color(0xFF2A212F)
+val NightSurfaceHigh = Color(0xFF33283A)
+val NightSurfaceVariant = Color(0xFF3B2F3F)
+val NightInk = Color(0xFFF6EDF3)
+val NightInkSoft = Color(0xFFD6C2D0)
+val NightLine = Color(0xFF514356)
+  </script>
+  <script type="text/plain" class="code" data-lang="kotlin" data-title="ui/theme/Theme.kt (파일 전체 교체)" data-path="app/src/main/java/com/example/mungtimer/ui/theme/Theme.kt">
+package com.example.mungtimer.ui.theme
+
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+
+// 색의 "역할"마다 뭉 색을 연결한다. 적지 않은 역할은 Material 3의 기본 색을 쓴다
+private val LightColorScheme = lightColorScheme(
+    primary = MungPink,
+    onPrimary = Color.White,
+    primaryContainer = MungPinkSoft,
+    onPrimaryContainer = MungPinkInk,
+    secondary = MungMint,
+    onSecondary = Color.White,
+    secondaryContainer = MungMintSoft,
+    onSecondaryContainer = MungMintInk,
+    tertiary = MungLavender,
+    background = MungCream,
+    onBackground = MungInk,
+    surface = MungCream,
+    onSurface = MungInk,
+    surfaceVariant = MungPeach,
+    onSurfaceVariant = MungInkSoft,
+    surfaceContainer = MungCreamDeep,
+    surfaceContainerHigh = MungCreamDeeper,
+    outlineVariant = MungLine,
+)
+
+private val DarkColorScheme = darkColorScheme(
+    primary = NightPink,
+    onPrimary = NightPinkInk,
+    primaryContainer = NightPinkDeep,
+    onPrimaryContainer = MungPinkSoft,
+    secondary = NightMint,
+    onSecondary = MungMintInk,
+    secondaryContainer = NightMintDeep,
+    onSecondaryContainer = MungMintSoft,
+    tertiary = NightLavender,
+    background = NightBackground,
+    onBackground = NightInk,
+    surface = NightBackground,
+    onSurface = NightInk,
+    surfaceVariant = NightSurfaceVariant,
+    onSurfaceVariant = NightInkSoft,
+    surfaceContainer = NightSurface,
+    surfaceContainerHigh = NightSurfaceHigh,
+    outlineVariant = NightLine,
+)
+
+@Composable
+fun MungTimerTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),     // 폰이 다크 모드인가
+    content: @Composable () -> Unit,
+) {
+    // 다이내믹 컬러(배경화면 색 따라가기)는 쓰지 않고, 항상 뭉 색을 쓴다
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = Typography,
+        content = content,
+    )
+}
+  </script>
+  <div class="note">저장하고 <code>TimerContent.kt</code>의 Preview를 보세요. 화면 코드를 한 줄도 고치지 않았는데 색이 바뀌어 있습니다. Preview 함수 위에 <code>@Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)</code>를 하나 더 붙이면 다크 모드도 나란히 볼 수 있습니다.</div>
+</section>
+
+<section class="sec" data-sec="studio">
+  <h3>A. Navigation 3 추가하기</h3>
+  <script type="text/plain" class="code" data-lang="kts" data-title="app/build.gradle.kts — dependencies 블록에 추가" data-hl="4-6">
+dependencies {
+    // … 기존 줄들과 Day 4~6에 추가한 줄들 …
+
+    // Day 7: Navigation 3 (화면 이동)
+    implementation("androidx.navigation3:navigation3-runtime:1.2.1")
+    implementation("androidx.navigation3:navigation3-ui:1.2.1")
+}
+  </script>
+  <p><b>Sync Now</b>를 누릅니다. 이것으로 7일 동안 추가한 라이브러리는 모두 11줄(플러그인 2개 포함)입니다.</p>
+
+  <h3>B. 앱 이름 바꾸기</h3>
+  <ol class="steps">
+    <li>Project 창에서 <span class="menu-path">app → res → values → strings.xml</span>을 엽니다.</li>
+    <li><code>app_name</code>의 값을 바꿉니다. 홈 화면 아이콘 아래에 표시되는 이름입니다.</li>
+  </ol>
+  <script type="text/plain" class="code" data-lang="xml" data-title="res/values/strings.xml" data-path="app/src/main/res/values/strings.xml">
+<resources>
+    <string name="app_name">뭉타이머</string>
+</resources>
+  </script>
+
+  <h3>C. 앱 아이콘 만들기 (Image Asset Studio)</h3>
+  <ol class="steps">
+    <li>Project 창에서 <code>res</code> 폴더를 오른쪽 클릭 → <span class="menu-path">New → Image Asset</span></li>
+    <li><b>Icon Type</b>은 <b>Launcher Icons (Adaptive and Legacy)</b> 그대로 둡니다.</li>
+    <li><b>Foreground Layer</b> 탭 → Asset Type에서 <b>Text</b>를 고르고 <code>뭉</code>을 입력합니다. (그려 둔 그림이 있으면 <b>Image</b>로 불러옵니다.) 아래 <b>Resize</b> 슬라이더로 미리보기의 안전 영역(원) 안에 들어오게 줄입니다.</li>
+    <li><b>Background Layer</b> 탭 → Asset Type <b>Color</b> → 색을 <code>FF8FA3</code>(뭉 분홍)으로 지정합니다.</li>
+    <li><b>Next → Finish</b>. 기존 아이콘 파일을 덮어쓴다는 경고는 그대로 진행합니다.</li>
+    <li>앱을 다시 실행해 홈 화면에서 아이콘과 이름을 확인합니다.</li>
+  </ol>
+
+  <h3>D. 다크 모드와 큰 글자로 점검하기</h3>
+  <ul>
+    <li><b>다크 모드</b>: 기기의 빠른 설정에서 "다크 모드"를 켜고 세 화면을 모두 봅니다. 글자가 배경에 묻히는 곳이 없는지 확인합니다.</li>
+    <li><b>큰 글자</b>: <span class="menu-path">설정 → 디스플레이 → 글자 크기</span>를 최대로 키워 글자가 잘리지 않는지 봅니다.</li>
+    <li><b>회전</b>: 세 화면 각각에서 회전해 입력하던 글자와 보던 탭이 유지되는지 봅니다.</li>
+  </ul>
+
+  <h3>E. debug APK 만들어 친구 폰에 설치하기</h3>
+  <ol class="steps">
+    <li>메뉴 <b>Build</b>에서 APK를 만드는 항목을 고릅니다. 버전에 따라 이름이 <span class="menu-path">Generate App Bundles or APKs → Generate APKs</span> 또는 <span class="menu-path">Build Bundle(s) / APK(s) → Build APK(s)</span>입니다. 못 찾겠으면 <kbd>Shift</kbd> 두 번 → "APK" 검색.</li>
+    <li>오른쪽 아래에 완료 알림이 뜨면 <b>locate</b>를 눌러 폴더를 엽니다. 파일 위치는 <code>MungTimer/app/build/outputs/apk/debug/app-debug.apk</code>입니다.</li>
+    <li>파일을 친구에게 보냅니다(구글 드라이브 링크, 메신저의 파일 전송, USB 복사 등).</li>
+    <li>친구 폰에서 파일을 열면 "출처를 알 수 없는 앱"을 설치할지 묻습니다. 파일을 연 앱(예: 드라이브, 파일 앱)에 <b>이 출처 허용</b>을 켜고 <b>설치</b>합니다. Play 프로텍트가 경고하면 <b>세부정보 → 무시하고 설치</b>를 고릅니다.</li>
+    <li>친구가 닉네임을 정하고 내 <b>초대 코드</b>로 참여하면, 두 폰의 랭킹에 서로가 보입니다. 🎉</li>
+  </ol>
+  <p>메뉴 대신 명령으로도 만들 수 있습니다. 아래쪽 <b>Terminal</b> 창에 입력합니다.</p>
+  <script type="text/plain" class="code" data-lang="shell" data-title="Terminal">
+# Windows
+.\gradlew.bat assembleDebug
+
+# macOS / Linux
+./gradlew assembleDebug
+  </script>
+  <div class="note warn"><b>APK를 다시 보낼 때 알아 둘 것</b> — ① debug APK는 <b>내 컴퓨터의 디버그 키</b>로 서명됩니다. 같은 컴퓨터에서 만든 새 APK는 친구 폰에 덮어 설치되고 데이터도 유지됩니다. ② 다른 컴퓨터에서 만들었거나 release APK로 바꾸면 서명이 달라 "앱이 설치되지 않았습니다"가 뜹니다. 이때는 기존 앱을 삭제해야 하는데, <b>삭제하면 도감과 익명 계정(그룹 소속)이 사라집니다.</b> ③ 새 버전을 보낼 때는 <code>app/build.gradle.kts</code>의 <code>versionCode</code>를 1씩 올리고 <code>versionName</code>도 바꿔 두면 구분하기 좋습니다.</div>
+
+  <h3>F. (선택) 서명된 release APK</h3>
+  <ol class="steps">
+    <li><span class="menu-path">Build → Generate Signed Bundle/APK</span> (버전에 따라 "Generate Signed App Bundle or APK") → <b>APK</b> 선택 → Next.</li>
+    <li>Key store path 아래의 <b>Create new</b>를 눌러 키스토어 파일(<code>.jks</code>)의 위치와 비밀번호, 키 이름(alias), 유효 기간(기본 25년), 이름을 입력합니다.</li>
+    <li>Next → Build Variant에서 <b>release</b>를 고르고 <b>Create</b>(또는 Finish). 결과물은 <code>app/release/app-release.apk</code>에 생깁니다.</li>
+  </ol>
+  <div class="note warn"><b>키스토어 파일과 비밀번호를 잃어버리면 같은 앱으로 다시는 업데이트를 낼 수 없습니다.</b> 프로젝트 폴더 밖의 안전한 곳에 백업하고, 깃허브 같은 공개 저장소에는 절대 올리지 마세요.</div>
+
+  <h3>G. 프로젝트 정리</h3>
+  <ul>
+    <li><b>연습 코드 지우기</b>: <code>practice</code> 패키지를 오른쪽 클릭 → <span class="menu-path">Delete</span>. "Safe delete"를 체크하면 다른 곳에서 쓰이고 있는지 먼저 검사해 줍니다.</li>
+    <li><b>안 쓰는 import 정리</b>: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>O</kbd> (macOS <kbd>Ctrl</kbd>+<kbd>Option</kbd>+<kbd>O</kbd>)</li>
+    <li><b>경고 살펴보기</b>: 아래쪽 <b>Problems</b> 창, 또는 메뉴 <span class="menu-path">Code → Inspect Code</span>. 노란 경고를 하나씩 읽어 보는 것만으로도 좋은 공부가 됩니다.</li>
+    <li><b>이상하게 빌드가 안 될 때</b>: <span class="menu-path">Build → Clean Project</span> 후 다시 빌드. 그래도 안 되면 <span class="menu-path">File → Invalidate Caches → Invalidate and Restart</span>.</li>
+  </ul>
+
+  <h3>오늘의 단축키</h3>
+  <div class="table-wrap"><table>
+    <tr><th>기능</th><th>Windows / Linux</th><th>macOS</th></tr>
+    <tr><td>안 쓰는 import 정리</td><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>O</kbd></td><td><kbd>Ctrl</kbd>+<kbd>Option</kbd>+<kbd>O</kbd></td></tr>
+    <tr><td>코드 줄 맞춤</td><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>L</kbd></td><td><kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>L</kbd></td></tr>
+    <tr><td>다음 오류/경고로 이동</td><td><kbd>F2</kbd></td><td><kbd>F2</kbd></td></tr>
+    <tr><td>선택한 코드를 함수로 뽑아내기</td><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd></td><td><kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>M</kbd></td></tr>
+    <tr><td>Terminal 창 열기</td><td><kbd>Alt</kbd>+<kbd>F12</kbd></td><td><kbd>Option</kbd>+<kbd>F12</kbd></td></tr>
+  </table></div>
+</section>
+
+<section class="sec" data-sec="quiz">
+  <div class="q" data-type="mc" data-answer="2">
+    <p class="q-title">백 스택이 <code>[타이머, 도감]</code>일 때 폰의 뒤로 가기를 누르면?</p>
+    <ul class="q-options">
+      <li>앱이 닫힌다</li>
+      <li>도감이 내려가고 타이머 화면이 보인다</li>
+      <li>도감 화면이 한 번 더 쌓인다</li>
+      <li>백 스택이 비어서 오류가 난다</li>
+    </ul>
+    <div class="q-explain"><p>뒤로 가기는 맨 위 접시(도감)를 내립니다. 남은 맨 위가 타이머이므로 타이머가 보입니다. 한 장만 남은 상태에서 뒤로 가면 그때 앱이 닫힙니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="add">
+    <p class="q-title">3번 뭉의 상세 화면으로 이동하려고 합니다. 빈칸에 들어갈 함수는?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+backStack.____(MungDetailKey(mungId = 3))
+    </script>
+    <div class="q-explain"><p>Navigation 3에서 "앞으로 이동"은 백 스택 목록에 키를 <code>add</code>하는 것입니다. 목록이 바뀌면 <code>NavDisplay</code>가 알아서 새 화면을 보여 줍니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="3">
+    <p class="q-title"><code>NavDisplay</code>가 하는 일로 알맞은 것은?</p>
+    <ul class="q-options">
+      <li>백 스택 목록을 직접 만들고 소유한다</li>
+      <li>화면 아래의 탭 막대를 그린다</li>
+      <li>백 스택의 맨 위 키에 해당하는 화면을 보여 주고, 뒤로 가기가 일어나면 <code>onBack</code>을 부른다</li>
+      <li>서버에서 화면 목록을 내려받는다</li>
+    </ul>
+    <div class="q-explain"><p>백 스택의 주인은 우리 코드(여기서는 <code>NavViewModel</code>)입니다. <code>NavDisplay</code>는 그 목록을 <b>지켜보다가</b> 맨 위에 맞는 화면을 그릴 뿐입니다. 탭 막대는 <code>Scaffold</code>의 <code>bottomBar</code>에 우리가 직접 그립니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="1">
+    <p class="q-title">백 스택을 <code>remember { mutableStateListOf(…) }</code>로만 만들면 화면을 회전했을 때 어떻게 될까요?</p>
+    <ul class="q-options">
+      <li>백 스택이 새로 만들어져 첫 화면으로 돌아간다</li>
+      <li>보던 화면이 그대로 유지된다</li>
+      <li>앱이 종료된다</li>
+      <li>컴파일 오류가 난다</li>
+    </ul>
+    <div class="q-explain"><p>Day 3~4에서 본 것과 같습니다. <code>remember</code>는 회전을 버티지 못합니다. 그래서 뭉타이머는 백 스택을 ViewModel(<code>NavViewModel</code>)에 둡니다.</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="removeLastOrNull">
+    <p class="q-title">뒤로 가기가 일어나면 백 스택의 맨 위를 내리려고 합니다. 빈칸은? (모든 기기에서 안전한 코틀린 함수)</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+NavDisplay(
+    backStack = backStack,
+    onBack = { backStack.____() },
+    entryProvider = entryProvider { /* … */ },
+)
+    </script>
+    <div class="q-explain"><p><code>removeLastOrNull()</code>입니다. 마지막 항목을 빼고, 비어 있으면 죽지 않고 null을 돌려줍니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="4">
+    <p class="q-title">화면 코드에서 <code>Color(0xFFC2385C)</code>를 직접 쓰지 않고 <code>MaterialTheme.colorScheme.primary</code>를 쓰는 가장 큰 이유는?</p>
+    <ul class="q-options">
+      <li>글자 수가 더 짧아서</li>
+      <li>색을 직접 쓰면 컴파일 오류가 나서</li>
+      <li>테마를 거치면 앱 실행이 빨라져서</li>
+      <li>테마 한 곳만 바꾸면 모든 화면의 색이 함께 바뀌고, 다크 모드에도 자동으로 대응돼서</li>
+    </ul>
+    <div class="q-explain"><p>색에 "역할"을 주는 방식의 장점입니다. 오늘 <code>Theme.kt</code>만 바꿨는데 타이머 · 도감 · 그룹 화면이 모두 바뀐 것이 그 증거입니다. (등급 색처럼 "항상 같은 색이어야 하는 의미"는 예외로 직접 지정합니다.)</p></div>
+  </div>
+
+  <div class="q" data-type="fill" data-answer="coerceAtMost">
+    <p class="q-title">타이머를 켜 둔 채 잠들어도 한 번에 최대 6시간까지만 인정하려고 합니다. 빈칸은?</p>
+    <script type="text/plain" class="code" data-lang="kotlin">
+const val MAX_SESSION_SECONDS = 6 * 60 * 60L
+
+val totalSeconds = (elapsedMillis() / 1000).____(MAX_SESSION_SECONDS)
+    </script>
+    <div class="q-explain"><p><code>coerceAtMost(최댓값)</code>은 "이 값을 넘으면 최댓값으로 맞춘다"입니다. 반대는 <code>coerceAtLeast</code>, 양쪽 모두는 Day 3의 <code>coerceIn</code>입니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="2">
+    <p class="q-title">친구가 내 debug APK를 설치해 쓰고 있습니다. 나중에 같은 앱의 <b>release</b> APK를 보내 덮어 설치하게 하면?</p>
+    <ul class="q-options">
+      <li>아무 문제 없이 업데이트된다</li>
+      <li>서명이 달라 설치가 거부된다. 기존 앱을 삭제해야 하고, 그러면 저장된 데이터가 사라진다</li>
+      <li>두 앱이 따로따로 설치된다</li>
+      <li>release APK는 플레이 스토어로만 설치할 수 있다</li>
+    </ul>
+    <div class="q-explain"><p>안드로이드는 같은 패키지 이름의 앱을 <b>같은 서명일 때만</b> 덮어 설치합니다. debug 키와 release 키는 다른 서명입니다. 그래서 배포 방식은 처음에 정하고 바꾸지 않는 것이 좋습니다.</p></div>
+  </div>
+
+  <div class="q" data-type="mc" data-answer="3">
+    <p class="q-title">"그룹 탭에서 가끔 앱이 죽는다"는 제보를 받았습니다. 가장 먼저 할 일은?</p>
+    <ul class="q-options">
+      <li>그룹 화면 코드를 처음부터 다시 쓴다</li>
+      <li>의심 가는 곳마다 <code>try / catch</code>를 넣는다</li>
+      <li>어떤 순서로 조작하면 죽는지 재현 방법을 찾고, Logcat에서 예외 이름과 줄 번호를 확인한다</li>
+      <li>Firebase 프로젝트를 새로 만든다</li>
+    </ul>
+    <div class="q-explain"><p>재현과 증거가 먼저입니다. 원인을 모른 채 고치면 고쳐졌는지도 확인할 수 없습니다. 무작정 넣은 <code>try / catch</code>는 문제를 숨길 뿐입니다.</p></div>
+  </div>
+</section>
+
+<section class="sec" data-sec="task">
+  <h3>과제: 뭉타이머 완성하기</h3>
+  <p>네 가지를 합니다. <b>① Navigation 3로 교체 ② 테마 · 이름 · 아이콘 ③ 버그 3개 수정 ④ 최종 점검과 APK.</b></p>
+
+  <h4>요구사항 체크리스트</h4>
+  <ul class="checklist">
+    <li>Navigation 3 라이브러리 2줄을 추가하고 Sync했다</li>
+    <li><code>AppNavigation.kt</code> — <code>enum class Screen</code>(label, icon), 백 스택을 가진 <code>NavViewModel</code>(<code>selectTab</code>, <code>goBack</code>), <code>MungTimerApp()</code> 컴포저블(<code>Scaffold</code> + <code>NavigationBar</code> + <code>NavDisplay</code>)을 만들었다</li>
+    <li><code>MainActivity</code>가 <code>MungTimerTheme { MungTimerApp() }</code>만 부른다</li>
+    <li>도감/그룹에서 뒤로 가기 → 타이머, 타이머에서 뒤로 가기 → 앱이 닫힌다. 회전해도 보던 탭이 유지된다</li>
+    <li>예제 3의 <code>Color.kt</code> · <code>Theme.kt</code>를 적용했고, 앱 이름을 "뭉타이머"로, 아이콘을 내 것으로 바꿨다</li>
+    <li>버그 ① 실수로 [종료]를 눌러도 바로 끝나지 않게 <b>확인 창</b>을 띄운다. 30분 미만이면 "지금 종료하면 뭉이 나오지 않아요"라고 알려 준다</li>
+    <li>버그 ② 타이머를 켜 둔 채 잊어도 한 번에 <b>최대 6시간</b>까지만 기록된다</li>
+    <li>버그 ③ 인터넷이 안 될 때 그룹 화면이 끝없이 로딩되지 않고, <b>15초 뒤 안내 문구</b>가 나온다</li>
+    <li><code>MIN_SECONDS_FOR_MUNG</code>이 <code>30 * 60L</code>인지 확인했다 (테스트용 값이 남아 있지 않다)</li>
+    <li>아래 "최종 점검표"를 모두 통과했다</li>
+    <li>debug APK를 만들어 다른 기기에 설치했다</li>
+  </ul>
+
+  <details class="hint"><summary>힌트 1 — NavViewModel</summary>
+    <p><code>class NavViewModel : ViewModel() { val backStack = mutableStateListOf(Screen.TIMER) … }</code>. <code>selectTab</code>과 <code>goBack</code>은 예제 1의 함수와 거의 같습니다(문자열 대신 <code>Screen</code>). 저장소가 필요 없으니 <code>AndroidViewModel</code>이 아니라 그냥 <code>ViewModel</code>이면 됩니다.</p>
+  </details>
+  <details class="hint"><summary>힌트 2 — enum 키와 entryProvider</summary>
+    <p>키가 enum이면 <code>entryProvider = { key -&gt; when (key) { Screen.TIMER -&gt; NavEntry(key) { TimerScreen() } … } }</code>처럼 <code>when</code>으로 씁니다. enum의 모든 값을 다루므로 <code>else</code>가 필요 없습니다. 탭 막대는 <code>for (screen in Screen.entries)</code>로 돌며 <code>NavigationBarItem</code>을 만들고, 선택 여부는 <code>backStack.last() == screen</code>.</p>
+  </details>
+  <details class="hint"><summary>힌트 3 — 종료 확인 창</summary>
+    <p><code>TimerScreen</code>에 <code>var showConfirm by rememberSaveable { mutableStateOf(false) }</code>를 두고, <code>onFinish = { showConfirm = true }</code>로 바꿉니다. <code>if (showConfirm) AlertDialog(…)</code>에서 확인을 누르면 <code>showConfirm = false</code> 후 <code>viewModel.finish()</code>. <code>AlertDialog</code>의 <code>dismissButton</code>에 "계속 공부하기"를 넣습니다. 문구는 <code>minutesUntilMung(elapsedSeconds)</code>가 null인지로 나눕니다.</p>
+  </details>
+  <details class="hint"><summary>힌트 4 — 시간 제한 걸기</summary>
+    <p><code>withTimeoutOrNull(15_000) { task() }</code>는 15초 안에 끝나면 결과(<code>Unit</code>)를, 못 끝나면 작업을 취소하고 <code>null</code>을 돌려줍니다. 뒤에 <code>?: error("…")</code>를 붙이면 시간 초과가 평범한 예외가 되어 기존 <code>catch</code>가 문구를 보여 줍니다.</p>
+  </details>
+
+  <details class="answer"><summary>모범 답안 보기</summary>
+    <h4>① Navigation 3로 교체</h4>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="AppNavigation.kt (새 파일, MainActivity.kt와 같은 패키지)" data-path="app/src/main/java/com/example/mungtimer/AppNavigation.kt">
+package com.example.mungtimer
+
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.ui.NavDisplay
+import com.example.mungtimer.collection.CollectionScreen
+import com.example.mungtimer.group.GroupScreen
+import com.example.mungtimer.timer.TimerScreen
+
+// 키: 앱의 화면 3개. 탭에 보여 줄 글자와 아이콘도 함께 가진다
+enum class Screen(val label: String, val icon: String) {
+    TIMER("타이머", "⏱️"),
+    COLLECTION("도감", "📖"),
+    GROUP("그룹", "👥"),
+}
+
+// 백 스택의 주인. ViewModel이라서 화면을 회전해도 보던 탭이 유지된다
+class NavViewModel : ViewModel() {
+
+    // 백 스택: 항상 [타이머] 또는 [타이머, 다른 탭]
+    val backStack = mutableStateListOf(Screen.TIMER)
+
+    // 하단 탭을 눌렀을 때
+    fun selectTab(screen: Screen) {
+        while (backStack.size > 1) backStack.removeLastOrNull()   // 타이머만 남기고 내린다
+        if (screen != Screen.TIMER) backStack.add(screen)         // 고른 탭을 올린다
+    }
+
+    // 뒤로 가기
+    fun goBack() {
+        if (backStack.size > 1) backStack.removeLastOrNull()
+    }
+}
+
+// 앱 전체의 틀: 아래에 탭 막대, 그 위에 지금 화면
+@Composable
+fun MungTimerApp(navViewModel: NavViewModel = viewModel()) {
+    val backStack = navViewModel.backStack
+    val currentScreen = backStack.last()            // 맨 위 = 지금 보이는 화면
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        bottomBar = {
+            NavigationBar {
+                // enum의 모든 값을 돌며 탭을 만든다. 화면이 늘어나도 이 코드는 그대로
+                for (screen in Screen.entries) {
+                    NavigationBarItem(
+                        selected = currentScreen == screen,
+                        onClick = { navViewModel.selectTab(screen) },
+                        icon = { Text(screen.icon) },
+                        label = { Text(screen.label) },
+                    )
+                }
+            }
+        },
+    ) { innerPadding ->
+        // NavDisplay: 백 스택의 맨 위 키에 해당하는 화면을 보여 준다
+        NavDisplay(
+            backStack = backStack,
+            onBack = { navViewModel.goBack() },     // 폰의 뒤로 가기 버튼/제스처
+            modifier = Modifier.padding(innerPadding),
+            entryProvider = { key ->
+                when (key) {
+                    Screen.TIMER -> NavEntry(key) { TimerScreen() }
+                    Screen.COLLECTION -> NavEntry(key) { CollectionScreen() }
+                    Screen.GROUP -> NavEntry(key) { GroupScreen() }
+                }
+            },
+        )
+    }
+}
+    </script>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="MainActivity.kt (최종 버전 — 파일 전체 교체)" data-path="app/src/main/java/com/example/mungtimer/MainActivity.kt">
+package com.example.mungtimer
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import com.example.mungtimer.ui.theme.MungTimerTheme
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            MungTimerTheme {
+                MungTimerApp()      // 화면 이동은 AppNavigation.kt가 맡는다
+            }
+        }
+    }
+}
+    </script>
+    <p>Day 5~6의 임시 코드(<code>currentTab</code>, <code>when (currentTab)</code>)가 사라지고 <code>MainActivity</code>는 20줄이 되었습니다. 세 화면의 ViewModel은 지금처럼 Activity에 묶여 앱이 켜져 있는 동안 유지됩니다. 타이머가 탭을 옮겨 다녀도 끊기지 않는 이유입니다.</p>
+
+    <h4>② 버그 수정 1 — 종료 확인 창</h4>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="timer/TimerScreen.kt (최종 버전 — 파일 전체 교체)" data-path="app/src/main/java/com/example/mungtimer/timer/TimerScreen.kt" data-hl="17-19,38-39,46,50-59,67-91">
+package com.example.mungtimer.timer
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+
+@Composable
+fun TimerScreen(
+    modifier: Modifier = Modifier,
+    viewModel: TimerViewModel = viewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // "정말 종료할까요?" 창이 떠 있는가. 화면 안에서만 쓰는 값이라 여기에 둔다
+    var showConfirm by rememberSaveable { mutableStateOf(false) }
+
+    TimerContent(
+        status = uiState.status,
+        elapsedSeconds = uiState.elapsedSeconds,
+        onStart = { viewModel.start() },
+        onPause = { viewModel.pause() },
+        onFinish = { showConfirm = true },          // 바로 끝내지 않고 먼저 물어본다
+        modifier = modifier,
+    )
+
+    if (showConfirm) {
+        ConfirmFinishDialog(
+            elapsedSeconds = uiState.elapsedSeconds,
+            onConfirm = {
+                showConfirm = false
+                viewModel.finish()
+            },
+            onDismiss = { showConfirm = false },
+        )
+    }
+
+    val result = uiState.result
+    if (result != null) {
+        ResultDialog(result = result, onDismiss = { viewModel.dismissResult() })
+    }
+}
+
+// 종료 확인 창: 30분이 안 됐으면 뭉이 나오지 않는다는 것을 미리 알려 준다
+@Composable
+fun ConfirmFinishDialog(elapsedSeconds: Long, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val remainingMinutes = minutesUntilMung(elapsedSeconds)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("공부를 끝낼까요?") },
+        text = {
+            Text(
+                if (remainingMinutes == null) {
+                    "지금 종료하면 뭉을 뽑을 수 있어요!"
+                } else {
+                    "뭉까지 ${remainingMinutes}분 남았어요. 지금 종료하면 뭉이 나오지 않아요."
+                }
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text("종료하기") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("계속 공부하기") }
+        },
+    )
+}
+
+// 종료 결과 창: 뭉이 나왔으면 뭉을, 아니면 안내 문구를 보여 준다
+@Composable
+fun ResultDialog(result: FinishResult, onDismiss: () -> Unit) {
+    val mung = result.mung
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (mung != null) "뭉을 만났어요!" else "공부 끝!") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (mung != null) {
+                    val gradeColor = Color(mung.grade.colorHex)
+                    val stars = "★".repeat(mung.grade.stars)
+
+                    Box(
+                        modifier = Modifier
+                            .size(96.dp)
+                            .clip(CircleShape)
+                            .background(gradeColor),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(text = mung.emoji, fontSize = 48.sp)
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(text = mung.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(text = "${mung.grade.label} $stars", color = gradeColor, fontWeight = FontWeight.Bold)
+                    Text(text = mung.description, textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(text = "${formatTime(result.studySeconds)} 공부 완료!")
+                } else {
+                    // 30분 미만: 뭉 없이 안내 메시지만
+                    Text(text = resultMessage(result.studySeconds), textAlign = TextAlign.Center)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(if (mung != null) "도감에 넣기" else "확인")
+            }
+        },
+    )
+}
+    </script>
+
+    <h4>③ 버그 수정 2 — 한 번에 최대 6시간까지만 기록</h4>
+    <p><b>재현:</b> 타이머를 켜 둔 채 하룻밤이 지나면 "10시간 공부"가 기록되어 랭킹이 엉망이 됩니다. <b>원인:</b> 경과 시간에 상한이 없어서. <b>수정:</b> 상수 하나와 한 줄.</p>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="timer/TimeUtils.kt — 파일 맨 아래에 추가" data-append="app/src/main/java/com/example/mungtimer/timer/TimeUtils.kt">
+// 한 번의 공부로 인정하는 최대 시간(초). 타이머를 켜 둔 채 잊어버린 경우를 대비한다
+const val MAX_SESSION_SECONDS = 6 * 60 * 60L
+    </script>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="timer/TimerViewModel.kt — finish() 안의 이 한 줄을 (바꾸기 전)" data-patch-old="app/src/main/java/com/example/mungtimer/timer/TimerViewModel.kt#cap">
+        val totalSeconds = elapsedMillis() / 1000   // 초기화하기 전에 총 시간을 먼저 구한다
+    </script>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="timer/TimerViewModel.kt — 이렇게 바꾼다 (바꾼 후)" data-patch-new="app/src/main/java/com/example/mungtimer/timer/TimerViewModel.kt#cap" data-hl="2">
+        // 초기화하기 전에 총 시간을 먼저 구한다. 단, 최대 6시간까지만 인정한다
+        val totalSeconds = (elapsedMillis() / 1000).coerceAtMost(MAX_SESSION_SECONDS)
+    </script>
+
+    <h4>④ 버그 수정 3 — 인터넷이 안 될 때 끝없는 로딩</h4>
+    <p><b>재현:</b> 그룹에 들어가 있는 상태에서 비행기 모드를 켜고 [그룹 나가기]를 누릅니다. 진행 막대가 끝없이 움직이고 아무 일도 일어나지 않습니다. <b>원인:</b> Firestore의 쓰기는 서버의 확인을 받을 때까지 <code>await()</code>가 끝나지 않아서. <b>수정:</b> 서버 작업에 15초 시간 제한을 겁니다.</p>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="group/GroupViewModel.kt — runTask() 안의 이 부분을 (바꾸기 전)" data-patch-old="app/src/main/java/com/example/mungtimer/group/GroupViewModel.kt#timeout">
+            try {
+                task()
+            } catch (e: CancellationException) {
+    </script>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="group/GroupViewModel.kt — 이렇게 바꾼다 (바꾼 후)" data-patch-new="app/src/main/java/com/example/mungtimer/group/GroupViewModel.kt#timeout" data-hl="2-4">
+            try {
+                // 15초 안에 끝나지 않으면 작업을 취소하고 null을 돌려준다 → 평범한 예외로 바꿔 아래 catch가 받게 한다
+                withTimeoutOrNull(15_000) { task() }
+                    ?: error("서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.")
+            } catch (e: CancellationException) {
+    </script>
+    <p>파일 위쪽 import 목록에 <code>withTimeoutOrNull</code>을 추가합니다(빨간 글자에서 <kbd>Alt</kbd>+<kbd>Enter</kbd>).</p>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="group/GroupViewModel.kt — import 추가 (바꾸기 전)" data-patch-old="app/src/main/java/com/example/mungtimer/group/GroupViewModel.kt#import">
+import kotlinx.coroutines.launch
+    </script>
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="group/GroupViewModel.kt — import 추가 (바꾼 후)" data-patch-new="app/src/main/java/com/example/mungtimer/group/GroupViewModel.kt#import" data-hl="2">
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+    </script>
+    <div class="note">시간 제한에 걸려도 Firestore는 하려던 쓰기를 기기에 보관해 두었다가 인터넷이 연결되면 서버로 보냅니다. 그래서 안내 문구가 나온 뒤에 연결을 되살리고 [다시 불러오기]를 누르면, 나가기가 이미 반영되어 있을 수 있습니다.</div>
+    <p><b>확인 포인트:</b> 세 버그 모두 "재현 → 원인 한 줄 → 가장 작은 수정 → 다시 확인" 순서였습니다. 고친 뒤에는 같은 방법으로 다시 시도해 문제가 사라졌는지 꼭 확인하세요.</p>
+  </details>
+
+  <h3>최종 점검표</h3>
+  <p>명세의 네 기능을 처음부터 끝까지 직접 해 보며 체크합니다. 하나라도 실패하면 "버그를 잡는 순서"대로 고칩니다.</p>
+  <h4>1. 공부 타이머</h4>
+  <ul class="checklist">
+    <li>시작 → 일시정지 → 계속하기 → 종료가 모두 동작한다</li>
+    <li>실행 중에 홈으로 나갔다가 1분 뒤 돌아오면 그 1분이 반영돼 있다</li>
+    <li>실행 중에 앱을 완전히 종료했다가 다시 켜도 타이머가 이어지고 시간이 정확하다</li>
+    <li>화면을 회전해도 시간이 유지된다</li>
+    <li>[종료]를 누르면 확인 창이 먼저 뜬다</li>
+  </ul>
+  <h4>2. 뭉 뽑기 · 3. 등급과 도감</h4>
+  <ul class="checklist">
+    <li>30분 미만으로 종료하면 뭉 없이 안내 메시지만 나온다</li>
+    <li>30분 이상 종료하면 뭉 1마리가 등급 · 이름 · 설명과 함께 나온다</li>
+    <li>뽑은 뭉이 도감에 바로 나타나고, 같은 뭉을 또 뽑으면 마리 수가 늘어난다</li>
+    <li>앱을 종료했다 켜도 도감이 그대로다</li>
+    <li>도감에서 대표 뭉을 정하면 👑 표시가 붙는다</li>
+  </ul>
+  <h4>4. 그룹</h4>
+  <ul class="checklist">
+    <li>그룹을 만들면 초대 코드가 나오고, [초대하기]로 공유 창이 뜬다</li>
+    <li>다른 기기(또는 콘솔의 가짜 멤버)가 참여하면 랭킹에 실시간으로 나타난다</li>
+    <li>공부를 종료하면 내 오늘 시간이 올라가고, "이번 주"로 바꾸면 합계가 보인다</li>
+    <li>대표 뭉이 랭킹의 내 이름 옆에 보인다</li>
+    <li>비행기 모드에서도 타이머와 도감은 정상 동작하고, 그룹 탭을 열어도 앱이 죽지 않는다</li>
+  </ul>
+  <h4>마무리</h4>
+  <ul class="checklist">
+    <li>뒤로 가기: 도감/그룹 → 타이머 → 앱 닫힘</li>
+    <li>다크 모드에서 세 화면 모두 글자가 잘 보인다</li>
+    <li>앱 이름과 아이콘이 바뀌어 있다</li>
+  </ul>
+
+  <h3>🎉 7일 완주를 축하해요! 다음에 도전할 것들</h3>
+  <p>지금의 뭉타이머는 "범위를 줄인 대안"들로 만든 첫 버전입니다. 아래는 시작하기 전에 미뤄 둔 것들이고, 이제는 스스로 찾아 붙일 수 있는 기초가 생겼습니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>도전 과제</th><th>찾아볼 키워드</th><th>난이도</th></tr>
+    <tr><td>뭉 이모지를 직접 그린 그림으로 바꾸기</td><td>drawable 리소스, <code>Image(painterResource(…))</code></td><td>★</td></tr>
+    <tr><td>뽑기 연출(흔들리다 짠!)</td><td>Compose 애니메이션, <code>animate*AsState</code>, <code>AnimatedVisibility</code></td><td>★★</td></tr>
+    <tr><td>알림창에 타이머 표시</td><td>Foreground Service, 알림 채널, <code>POST_NOTIFICATIONS</code> 권한</td><td>★★★</td></tr>
+    <tr><td>기기를 바꿔도 계정 유지</td><td>Day 6 끝의 계정 연결, Credential Manager(구글 로그인)</td><td>★★★</td></tr>
+    <tr><td>그룹 피드(뭉 획득 소식)</td><td>Firestore 하위 컬렉션, <code>orderBy</code>, <code>limit</code></td><td>★★</td></tr>
+    <tr><td>로직이 맞는지 자동으로 검사</td><td>단위 테스트(JUnit), <code>app/src/test</code></td><td>★★</td></tr>
+    <tr><td>ViewModel에 재료를 넣어 주는 정석</td><td>의존성 주입(Hilt)</td><td>★★★</td></tr>
+    <tr><td>플레이 스토어 출시</td><td>Android App Bundle, Play Console, 개발자 인증</td><td>★★★</td></tr>
+  </table></div>
+  <p>막힐 때는 공식 문서 <a href="https://developer.android.com/develop/ui/compose" target="_blank" rel="noopener">developer.android.com</a>과 <a href="https://kotlinlang.org/docs/home.html" target="_blank" rel="noopener">kotlinlang.org</a>가 가장 정확합니다. 수고했어요. 뭉이 기다리고 있으니, 이제 진짜 공부하러 가요! 🌱</p>
 </section>
 
 </template>
