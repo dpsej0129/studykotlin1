@@ -27,8 +27,14 @@
          data-sec="task"    오늘의 과제
     4) <script>           : 동작(JS) — 메뉴, 문법 강조, 복사, 퀴즈, 진행률 저장
 
-  코드 블록은 <script type="text/plain" class="code"> 안에
+  코드 블록은 type="text/plain" class="code" 인 script 태그 안에
   "있는 그대로" 들어 있어서, 소스에서 바로 읽고 고칠 수 있습니다.
+  코드 블록에 붙은 속성의 뜻:
+    data-lang   문법 강조에 쓰는 언어 (kotlin, kts, xml, rules, output …)
+    data-title  코드 블록 위에 보이는 파일 이름
+    data-hl     초록색으로 강조할 줄 번호 (예: "3,5-7")
+    data-path   안드로이드 프로젝트에서 이 코드가 들어갈 파일 위치
+    data-run    순수 코틀린 예제의 이름표 (data-for 는 그 예제의 실행 결과)
   ============================================================
 -->
 <style>
@@ -606,7 +612,7 @@ details.answer > summary::after { content: "먼저 스스로 풀어 본 뒤에 �
 
   <h3>2) 안드로이드 스튜디오 설치 <small>(Day 1에서 단계별로 다시 안내)</small></h3>
   <ol class="steps">
-    <li><a href="https://developer.android.com/studio" target="_blank" rel="noopener">developer.android.com/studio</a>에서 <b>최신 안정 버전</b>을 내려받습니다. 이 사이트는 <b>Android Studio Rabbit 2 (2026.2.2)</b> 기준으로 작성하고 실제 빌드로 확인했습니다. 더 새 버전이 나와 있어도 그대로 쓰면 됩니다.</li>
+    <li><a href="https://developer.android.com/studio" target="_blank" rel="noopener">developer.android.com/studio</a>에서 <b>최신 안정 버전</b>을 내려받습니다. 이 사이트는 <b>Android Studio Rabbit 2 (2026.2.2)</b>가 최신 안정 버전이던 시점의 라이브러리를 기준으로 작성했습니다. 더 새 버전이 나와 있어도 그대로 쓰면 됩니다. 메뉴 이름이나 위치는 버전에 따라 조금 다를 수 있는데, 그럴 때는 <kbd>Shift</kbd>를 두 번 눌러 이름으로 검색하세요.</li>
     <li>설치 마법사는 전부 기본값(<b>Standard</b>)으로 진행합니다. Android SDK, 에뮬레이터, 필요한 도구가 함께 설치됩니다.</li>
     <li><b>JDK는 따로 설치하지 않아도 됩니다.</b> 안드로이드 스튜디오 안에 JDK(JetBrains Runtime)가 들어 있고, 프로젝트 빌드에 그것을 그대로 사용합니다.</li>
   </ol>
@@ -646,7 +652,7 @@ details.answer > summary::after { content: "먼저 스스로 풀어 본 뒤에 �
     <li><span class="d">Day 4</span><span><b>상태 관리와 코루틴</b><small>ViewModel, StateFlow, 코루틴 → 백그라운드에서도 정확한 타이머</small></span></li>
     <li><span class="d">Day 5</span><span><b>Room + 확률 로직</b><small>시간대별 확률표, 뽑기 코드, 로컬 DB → 뭉 뽑기와 뭉 도감</small></span></li>
     <li><span class="d">Day 6</span><span><b>Firebase</b><small>익명 로그인, Firestore → 그룹 생성/참여, 랭킹, 대표 뭉 자랑</small></span></li>
-    <li><span class="d">Day 7</span><span><b>완성</b><small>Navigation, 테마, 버그 수정, APK 빌드 → 친구 폰에 설치</small></span></li>
+    <li><span class="d">Day 7</span><span><b>완성</b><small>Navigation 3, 테마, 버그 수정, APK 빌드 → 친구 폰에 설치</small></span></li>
   </ul>
 
   <h3>요청하신 흐름에서 바꾼 점 4가지 (이유 포함)</h3>
@@ -710,10 +716,18 @@ details.answer > summary::after { content: "먼저 스스로 풀어 본 뒤에 �
 </section>
 
 <section class="sec" data-title="이 사이트의 코드가 기준으로 삼은 버전" data-icon="📌">
-  <p>아래 조합으로 <b>Day 3~7의 앱 코드를 실제로 빌드해 확인</b>했습니다(2026년 11월 기준 최신 안정 버전).</p>
+  <p>아래 조합(2026년 11월 기준 최신 안정 버전)으로 이 사이트의 코드를 확인했습니다. 어디까지 확인했는지도 솔직하게 적어 둡니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>확인한 방법</th><th>대상</th></tr>
+    <tr><td>실행해서 화면의 "실행 결과"와 대조</td><td>Day 1 · 2 · 4 · 5 · 6 · 7의 순수 코틀린 예제와 과제 답안, 확률 로직(구간별 10만 번 뽑기)</td></tr>
+    <tr><td>실제 안드로이드 프로젝트로 빌드 (경고 0개)</td><td>Day 3 ~ Day 7 각 날짜가 끝난 시점의 앱 전체</td></tr>
+    <tr><td>컴퓨터 위의 테스트 환경에서 실행</td><td>Room 저장과 조회, 꺼졌다 켜진 타이머의 복원, 종료 → 뽑기 → 도감 갱신, 탭 이동과 뒤로 가기, 종료 확인 창</td></tr>
+    <tr><td><b>확인하지 못한 것</b></td><td>실제 폰/에뮬레이터에서의 모습, 그리고 Firebase 서버와 주고받는 동작. Firebase는 여러분의 프로젝트가 있어야 해서 컴파일까지만 확인했습니다. Day 6에서 오류를 만나면 그날의 "자주 만나는 오류" 표를 먼저 보세요.</td></tr>
+  </table></div>
   <div class="table-wrap"><table>
     <tr><th>도구 / 라이브러리</th><th>버전</th><th>쓰는 날</th></tr>
-    <tr><td>Android Studio</td><td>Rabbit 2 (2026.2.2)</td><td>Day 1~</td></tr>
+    <tr><td>Android Studio (설치 안내 기준)</td><td>Rabbit 2 (2026.2.2)</td><td>Day 1~</td></tr>
+    <tr><td>Gradle</td><td>9.9.0</td><td>자동 설정</td></tr>
     <tr><td>Android Gradle Plugin (AGP)</td><td>9.5.1</td><td>자동 설정</td></tr>
     <tr><td>Kotlin</td><td>2.4.21</td><td>Day 1~</td></tr>
     <tr><td>Jetpack Compose BOM / Material 3</td><td>2026.09.00</td><td>Day 3~</td></tr>
@@ -722,10 +736,10 @@ details.answer > summary::after { content: "먼저 스스로 풀어 본 뒤에 �
     <tr><td>KSP</td><td>2.3.13</td><td>Day 5~</td></tr>
     <tr><td>Firebase BoM (Auth, Firestore)</td><td>35.1.0</td><td>Day 6~</td></tr>
     <tr><td>Google services 플러그인</td><td>4.5.0</td><td>Day 6~</td></tr>
-    <tr><td>Navigation Compose</td><td>2.10.2</td><td>Day 7</td></tr>
+    <tr><td>Navigation 3</td><td>1.2.1 (<code>androidx.navigation3</code>)</td><td>Day 7</td></tr>
   </table></div>
   <div class="note"><b>버전이 달라도 당황하지 마세요.</b> 안드로이드 스튜디오가 프로젝트를 만들 때 써 주는 버전 숫자(AGP, Kotlin, Compose BOM)는 <b>그대로 두는 것이 원칙</b>입니다. 이 사이트는 "마법사가 만든 파일에 <b>이 줄만 추가</b>하세요" 방식으로 안내합니다. 라이브러리를 추가한 뒤 숫자에 노란 밑줄이 생기면 더 새 버전이 있다는 뜻이고, 그대로 두어도 빌드됩니다.</div>
-  <div class="note warn"><b>인터넷 검색 결과와 코드가 다르게 보일 때</b> — 2026년 들어 바뀐 것이 있습니다. ① Room이 3.0이 되면서 패키지가 <code>androidx.room</code> → <code>androidx.room3</code>로 바뀌었습니다. ② AGP 9부터 <code>org.jetbrains.kotlin.android</code> 플러그인을 쓰지 않습니다(코틀린 지원이 내장됨). 오래된 글의 설정을 섞어 붙이면 빌드 오류가 나니, 설정은 이 사이트의 안내를 따라 주세요.</div>
+  <div class="note warn"><b>인터넷 검색 결과와 코드가 다르게 보일 때</b> — 최근에 바뀐 것이 있습니다. ① Room이 3.0이 되면서 패키지가 <code>androidx.room</code> → <code>androidx.room3</code>로 바뀌었습니다. ② AGP 9부터 <code>org.jetbrains.kotlin.android</code> 플러그인을 쓰지 않습니다(코틀린 지원이 내장됨). ③ 화면 이동은 <code>NavHost</code>/<code>NavController</code>를 쓰는 Navigation 2 대신 Compose용으로 새로 나온 <b>Navigation 3</b>를 씁니다. 오래된 글의 설정을 섞어 붙이면 빌드 오류가 나니, 설정은 이 사이트의 안내를 따라 주세요.</div>
 </section>
 
 <section class="sec" data-title="7일을 완주하는 공부법" data-icon="🧠">
@@ -2419,7 +2433,7 @@ Button(____ = { minutes += 10 }) {
   </ul>
 
   <details class="hint"><summary>힌트 1 — 화면의 뼈대</summary>
-    <p>전체는 <code>Column(modifier = modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally)</code>. 그 안에 위에서부터 <code>Box</code>(뭉 얼굴) → <code>Text</code>(문구) → <code>Text</code>(시간) → 진행 막대 → <code>Row</code>(버튼). 사이사이 <code>Spacer(Modifier.height(16.dp))</code>로 간격을 줍니다.</p>
+    <p>전체는 <code>Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally)</code>. <code>verticalScroll</code>은 내용이 화면보다 길 때 위아래로 밀어서 볼 수 있게 해 줍니다. 폰을 가로로 돌리면 화면이 낮아져 버튼이 잘릴 수 있기 때문에 넣습니다. 그 안에 위에서부터 <code>Box</code>(뭉 얼굴) → <code>Text</code>(문구) → <code>Text</code>(시간) → 진행 막대 → <code>Row</code>(버튼). 사이사이 <code>Spacer(Modifier.height(16.dp))</code>로 간격을 줍니다.</p>
   </details>
   <details class="hint"><summary>힌트 2 — 진행 막대</summary>
     <p><code>LinearProgressIndicator(progress = { 0.5f })</code>처럼 0~1 사이의 Float을 <b>람다로</b> 넘깁니다. 진행률은 <code>(elapsedSeconds.toFloat() / MIN_SECONDS_FOR_MUNG).coerceIn(0f, 1f)</code>. <code>coerceIn</code>은 "이 범위를 벗어나면 끝값으로 맞춰라"입니다.</p>
@@ -2494,7 +2508,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -2524,6 +2540,7 @@ fun TimerContent(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())  // 화면이 낮을 때(가로 모드, 작은 폰)는 스크롤해서 볼 수 있게
             .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -2700,7 +2717,7 @@ class MainActivity : ComponentActivity() {
     }
 }
     </script>
-    <p><b>확인 포인트:</b> ① <code>TimerContent.kt</code>에는 <code>remember</code>가 하나도 없습니다. 받은 값만 그립니다. 그래서 이 파일은 <b>오늘 이후 앱이 완성될 때까지 다시 고치지 않습니다.</b> 상태를 가진 <code>TimerScreen.kt</code>만 내일 바꿉니다. ② 시작 → 일시정지 → 계속하기를 세 번 반복하면 30분이 되어 진행 막대가 꽉 차고 문구가 바뀝니다. ③ 화면을 <b>회전</b>해 보세요. 시간이 0으로 돌아갑니다. <code>remember</code>의 한계이고, 내일 ViewModel로 해결합니다.</p>
+    <p><b>확인 포인트:</b> ① <code>TimerContent.kt</code>에는 <code>remember</code>가 하나도 없습니다. 받은 값만 그립니다. 그래서 이 파일은 <b>오늘 이후 앱이 완성될 때까지 다시 고치지 않습니다.</b> 상태를 가진 <code>TimerScreen.kt</code>만 내일 바꿉니다. ② 시작 → 일시정지 → 계속하기를 세 번 반복하면 30분이 되어 진행 막대가 꽉 차고 문구가 바뀝니다. ③ 화면을 <b>회전</b>해 보세요. 가로 화면에서는 내용이 다 들어가지 않지만 위아래로 밀어서 버튼을 누를 수 있고(<code>verticalScroll</code>), 시간은 0으로 돌아갑니다. <code>remember</code>의 한계이고, 내일 ViewModel로 해결합니다.</p>
   </details>
 </section>
 
@@ -3699,9 +3716,9 @@ dependencies {
 }
       </script>
     </li>
-    <li><b>Sync Now</b>를 누르고 오류 없이 끝나는지 확인합니다.</li>
+    <li><b>Sync Now</b>를 누르고 오류 없이 끝나는지 확인합니다. KSP 버전 숫자(<code>2.3.13</code>)에 관한 오류가 나면, 숫자 위의 노란 밑줄에서 <kbd>Alt</kbd>+<kbd>Enter</kbd>로 제안되는 최신 버전으로 올린 뒤 다시 Sync하세요.</li>
   </ol>
-  <div class="note warn"><b>자주 하는 실수</b> — ① 두 번째 줄을 <code>implementation(…room3-compiler…)</code>로 적으면 빌드는 되지만 실행하자마자 "AppDatabase_Impl does not exist" 오류로 죽습니다. 반드시 <code>ksp(…)</code>입니다. ② 인터넷 글을 따라 <code>org.jetbrains.kotlin.android</code>나 <code>kotlin-kapt</code> 플러그인을 추가하지 마세요. 최신 안드로이드 스튜디오 프로젝트에서는 필요 없고, 넣으면 오류가 납니다.</div>
+  <div class="note warn"><b>자주 하는 실수</b> — ① 두 번째 줄을 <code>implementation(…room3-compiler…)</code>로 적으면 Room이 코드를 만들어 주지 않아, 실행하자마자 <code>Cannot find implementation for …AppDatabase. AppDatabase_Impl does not exist</code> 오류로 죽습니다. 반드시 <code>ksp(…)</code>입니다. ② 인터넷 글을 따라 <code>org.jetbrains.kotlin.android</code>나 <code>kotlin-kapt</code> 플러그인을 추가하지 마세요. 최신 안드로이드 스튜디오 프로젝트에서는 필요 없고, 넣으면 오류가 납니다.</div>
 
   <h3>B. Database Inspector로 저장된 데이터 보기</h3>
   <ol class="steps">
@@ -4164,7 +4181,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -4214,7 +4233,9 @@ fun ResultDialog(result: FinishResult, onDismiss: () -> Unit) {
         title = { Text(if (mung != null) "뭉을 만났어요!" else "공부 끝!") },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),     // 화면이 낮으면 창 안에서 스크롤
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (mung != null) {
@@ -6799,10 +6820,10 @@ class MainActivity : ComponentActivity() {
     }
 }
     </script>
-    <p>Day 5~6의 임시 코드(<code>currentTab</code>, <code>when (currentTab)</code>)가 사라지고 <code>MainActivity</code>는 20줄이 되었습니다. 세 화면의 ViewModel은 지금처럼 Activity에 묶여 앱이 켜져 있는 동안 유지됩니다. 타이머가 탭을 옮겨 다녀도 끊기지 않는 이유입니다.</p>
+    <p>Day 5~6의 임시 코드(<code>currentTab</code>, <code>when (currentTab)</code>)가 사라지고 <code>MainActivity</code>는 스무 줄도 안 되는 파일이 되었습니다. 세 화면의 ViewModel은 지금처럼 Activity에 묶여 앱이 켜져 있는 동안 유지됩니다. 타이머가 탭을 옮겨 다녀도 끊기지 않는 이유입니다.</p>
 
     <h4>② 버그 수정 1 — 종료 확인 창</h4>
-    <script type="text/plain" class="code" data-lang="kotlin" data-title="timer/TimerScreen.kt (최종 버전 — 파일 전체 교체)" data-path="app/src/main/java/com/example/mungtimer/timer/TimerScreen.kt" data-hl="17-19,38-39,46,50-59,67-91">
+    <script type="text/plain" class="code" data-lang="kotlin" data-title="timer/TimerScreen.kt (최종 버전 — 파일 전체 교체)" data-path="app/src/main/java/com/example/mungtimer/timer/TimerScreen.kt" data-hl="19-21,40-41,48,52-61,69-93">
 package com.example.mungtimer.timer
 
 import androidx.compose.foundation.background
@@ -6812,7 +6833,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -6905,7 +6928,9 @@ fun ResultDialog(result: FinishResult, onDismiss: () -> Unit) {
         title = { Text(if (mung != null) "뭉을 만났어요!" else "공부 끝!") },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),     // 화면이 낮으면 창 안에서 스크롤
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (mung != null) {
@@ -7774,9 +7799,10 @@ import kotlinx.coroutines.withTimeoutOrNull
     renderNav();
     document.title = (page.day ? 'Day ' + page.day + ' ' : '') + page.title + ' · 뭉타이머 7일 완성';
 
+    /* 페이지를 바꿀 때는 부드러운 스크롤 없이 바로 이동한다 (이전 페이지의 스크롤 위치에서 미끄러지지 않게) */
     var target = sectionKey ? document.getElementById(page.id + '-' + sectionKey) : null;
-    if (target) target.scrollIntoView({ block: 'start' });
-    else window.scrollTo(0, 0);
+    if (target) target.scrollIntoView({ block: 'start', behavior: 'instant' });
+    else window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }
 
   /* 주소의 #day3 또는 #day3/quiz 형태를 읽어 페이지를 고릅니다 */
@@ -7784,7 +7810,7 @@ import kotlinx.coroutines.withTimeoutOrNull
     var hash = decodeURIComponent(window.location.hash.replace(/^#/, ''));
     var parts = hash.split('/');
     var id = pageById(parts[0]) ? parts[0] : (pageById(state.last) ? state.last : 'prep');
-    if (id === currentId && !parts[1]) { window.scrollTo(0, 0); return; }
+    if (id === currentId && !parts[1]) { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); return; }
     showPage(id, parts[1]);
   }
 
